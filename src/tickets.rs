@@ -56,7 +56,7 @@ where
     }
 
     pub fn add_user<'a>(&mut self, user: U) -> Option<U> {
-        self.users.insert(user.key(), user)
+        self.users.insert(user.move_key(), user)
     }
 
     pub fn set_users<'a, C>(&mut self, users: C)
@@ -64,7 +64,7 @@ where
         C: IntoIterator<Item = U>,
     {
         self.users.clear();
-        self.users = users.into_iter().map(|u| (u.key(), u)).collect();
+        self.users = users.into_iter().map(|u| (u.move_key(), u)).collect();
     }
 
     pub fn add_prize(&mut self, prize: Prize) {

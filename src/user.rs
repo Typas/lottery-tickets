@@ -1,9 +1,14 @@
+use std::hash::Hash;
+
 use crate::prize::Prize;
 use uuid::Uuid;
 
-pub trait User<'a, K> {
+pub trait User<'a, K>
+where
+    K: Hash + Eq,
+{
     /// returns the uuid of the user
-    fn key(&self) -> K;
+    fn move_key(&self) -> K;
     /// total count of lottery ticket
     fn ticket_count(&self) -> usize;
     /// add the prize, return false if failed
@@ -46,13 +51,13 @@ impl<'a> SinglePrizeUser<'a> {
         self.prize
     }
 
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 }
 
 impl<'a> User<'a, Uuid> for SinglePrizeUser<'a> {
-    fn key(&self) -> Uuid {
+    fn move_key(&self) -> Uuid {
         self.id
     }
 
@@ -88,13 +93,13 @@ impl<'a> MultiPrizeUser<'a> {
         &self.prizes
     }
 
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 }
 
 impl<'a> User<'a, Uuid> for MultiPrizeUser<'a> {
-    fn key(&self) -> Uuid {
+    fn move_key(&self) -> Uuid {
         self.id
     }
 
