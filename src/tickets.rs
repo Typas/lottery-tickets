@@ -1,20 +1,24 @@
-use std::{collections::{BinaryHeap, HashMap}, hash::RandomState};
+use std::{
+    collections::{BinaryHeap, HashMap},
+    hash::{Hash, RandomState},
+};
 
 use rand::Rng;
-use uuid::Uuid;
 
 use crate::{prize::Prize, user::User};
-pub struct Tickets<U, S = RandomState>
+pub struct Tickets<K, U, S = RandomState>
 where
-    for<'a> U: User<'a>,
+    K: Hash + Eq,
+    for<'a> U: User<'a, K>,
 {
-    users: HashMap<Uuid, U, S>,
+    users: HashMap<K, U, S>,
     prizes: Vec<Prize>,
 }
 
-impl<U> Tickets<U>
+impl<K, U> Tickets<K, U>
 where
-    for<'a> U: User<'a>,
+    K: Hash + Eq,
+    for<'a> U: User<'a, K>,
 {
     pub fn new() -> Self {
         Self {
@@ -31,10 +35,11 @@ where
     }
 }
 
-impl<U, S> Tickets<U, S>
+impl<K, U, S> Tickets<K, U, S>
 where
+    K: Hash + Eq,
+    for<'a> U: User<'a, K>,
     S: std::hash::BuildHasher + std::default::Default,
-    for<'a> U: User<'a>,
 {
     pub fn with_user_capacity_and_hasher(cap: usize, hasher: S) -> Self {
         Self {
@@ -51,7 +56,7 @@ where
     }
 
     pub fn add_user<'a>(&mut self, user: U) -> Option<U> {
-        self.users.insert(user.id(), user)
+        self.users.insert(user.key(), user)
     }
 
     pub fn set_users<'a, C>(&mut self, users: C)
@@ -59,7 +64,7 @@ where
         C: IntoIterator<Item = U>,
     {
         self.users.clear();
-        self.users = users.into_iter().map(|u| (u.id(), u)).collect();
+        self.users = users.into_iter().map(|u| (u.key(), u)).collect();
     }
 
     pub fn add_prize(&mut self, prize: Prize) {
@@ -79,8 +84,10 @@ where
         R: Rng,
     {
         let total_count = 0;
-        self.users_mut().fold(total_count, |c, u| {
-            u.set_begin(c);
+        // begin indexes corresponding to users
+        let mut user_begins: Vec<usize> = Vec::with_capacity(self.users.len());
+        self.users.values_mut().fold(total_count, |c, u| {
+            user_begins.push(c);
             c + u.ticket_count()
         });
         let range = 0..total_count;
@@ -95,8 +102,8 @@ where
         // dispatch prizes
         let prizes = &self.prizes; // thank you stack borrow
         let mut heap = BinaryHeap::new();
-        for user in self.users.values_mut() {
-            let (begin, end) = user.indexes();
+        for (user, begin) in self.users.values_mut().zip(user_begins) {
+            let end = begin + user.ticket_count();
             for i in begin..end {
                 if let Some(p) = Self::check_prize(prizes, numbers[i]) {
                     heap.push(PriorityPrize::new(p, &prizes[p]));
@@ -116,11 +123,11 @@ where
         todo!("shuffle several times to ensure every user would accept only zero or one prize.");
     }
 
-    pub fn users(&self) -> std::collections::hash_map::Values<'_, Uuid, U> {
+    pub fn users(&self) -> std::collections::hash_map::Values<'_, K, U> {
         self.users.values()
     }
 
-    pub fn users_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, Uuid, U> {
+    pub fn users_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, U> {
         self.users.values_mut()
     }
 
@@ -167,5 +174,4 @@ impl<'a> PartialEq for PriorityPrize<'a> {
     }
 }
 
-impl<'a> Eq for PriorityPrize<'a> {
-}
+impl<'a> Eq for PriorityPrize<'a> {}

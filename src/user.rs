@@ -1,43 +1,41 @@
 use crate::prize::Prize;
 use uuid::Uuid;
 
-pub trait User<'a> {
-    fn name(&self) -> &str;
-    fn id(&self) -> Uuid;
-    fn set_begin(&mut self, begin: usize);
+pub trait User<'a, K> {
+    /// returns the uuid of the user
+    fn key(&self) -> K;
+    /// total count of lottery ticket
     fn ticket_count(&self) -> usize;
-    fn indexes(&self) -> (usize, usize);
-    // add the prize, return false if failed
+    /// add the prize, return false if failed
     fn add_prize(&mut self, prize: &'a Prize) -> bool;
+    /// check if the user has at least one prize
     fn has_prize(&self) -> bool;
 }
 
 pub struct SinglePrizeUser<'a> {
-    begin: usize, // the starting index of `numbers` in `Tickets`
-    count: usize, // `end` would be C++ style, exclusive one
+    count: usize, // total count of lottery ticket
     name: String,
     id: Uuid,
     prize: Option<&'a Prize>,
 }
 
 pub struct MultiPrizeUser<'a> {
-    begin: usize, // the starting index of `numbers` in `Tickets`
-    count: usize, // `end` would be C++ style, exclusive one
+    count: usize, // total count of lottery ticket
     name: String,
     id: Uuid,
     prizes: Vec<&'a Prize>,
 }
 
 pub struct UserBuilder {
+    count: usize, // total count of lottery ticket
     name: Option<String>,
     id: Option<Uuid>,
 }
 
 impl<'a> SinglePrizeUser<'a> {
-    pub fn new(id: Uuid, name: String) -> Self {
+    pub fn new(id: Uuid, name: String, ticket_count: usize) -> Self {
         Self {
-            begin: 0,
-            count: 0,
+            count: ticket_count,
             name,
             id,
             prize: None,
@@ -47,27 +45,19 @@ impl<'a> SinglePrizeUser<'a> {
     pub fn prize(&self) -> Option<&Prize> {
         self.prize
     }
-}
-
-impl<'a> User<'a> for SinglePrizeUser<'a> {
-    fn set_begin(&mut self, start: usize) {
-        self.begin = start;
-    }
-
-    fn ticket_count(&self) -> usize {
-        self.count
-    }
-
-    fn indexes(&self) -> (usize, usize) {
-        (self.begin, self.begin + self.count)
-    }
 
     fn name(&self) -> &str {
         &self.name
     }
+}
 
-    fn id(&self) -> Uuid {
+impl<'a> User<'a, Uuid> for SinglePrizeUser<'a> {
+    fn key(&self) -> Uuid {
         self.id
+    }
+
+    fn ticket_count(&self) -> usize {
+        self.count
     }
 
     fn add_prize(&mut self, prize: &'a Prize) -> bool {
@@ -85,10 +75,9 @@ impl<'a> User<'a> for SinglePrizeUser<'a> {
 }
 
 impl<'a> MultiPrizeUser<'a> {
-    pub fn new(id: Uuid, name: String) -> Self {
+    pub fn new(id: Uuid, name: String, ticket_count: usize) -> Self {
         Self {
-            begin: 0,
-            count: 0,
+            count: ticket_count,
             name,
             id,
             prizes: Vec::new(),
@@ -98,27 +87,19 @@ impl<'a> MultiPrizeUser<'a> {
     pub fn prizes(&self) -> &Vec<&Prize> {
         &self.prizes
     }
-}
-
-impl<'a> User<'a> for MultiPrizeUser<'a> {
-    fn set_begin(&mut self, start: usize) {
-        self.begin = start;
-    }
-
-    fn ticket_count(&self) -> usize {
-        self.count
-    }
-
-    fn indexes(&self) -> (usize, usize) {
-        (self.begin, self.begin + self.count)
-    }
 
     fn name(&self) -> &str {
         &self.name
     }
+}
 
-    fn id(&self) -> Uuid {
+impl<'a> User<'a, Uuid> for MultiPrizeUser<'a> {
+    fn key(&self) -> Uuid {
         self.id
+    }
+
+    fn ticket_count(&self) -> usize {
+        self.count
     }
 
     fn add_prize(&mut self, prize: &'a Prize) -> bool {
@@ -136,6 +117,7 @@ impl UserBuilder {
         Self {
             name: None,
             id: None,
+            count: 0,
         }
     }
 
@@ -149,10 +131,14 @@ impl UserBuilder {
         self
     }
 
+    pub fn ticket_count(mut self, count: usize) -> Self {
+        self.count = count;
+        self
+    }
+
     pub fn build_single<'a>(self) -> SinglePrizeUser<'a> {
         SinglePrizeUser {
-            begin: 0,
-            count: 0,
+            count: self.count,
             name: self.name.unwrap_or_default(),
             id: self.id.unwrap_or_else(Uuid::new_v4),
             prize: None,
@@ -161,8 +147,7 @@ impl UserBuilder {
 
     pub fn build_multiple<'a>(self) -> MultiPrizeUser<'a> {
         MultiPrizeUser {
-            begin: 0,
-            count: 0,
+            count: self.count,
             name: self.name.unwrap_or_default(),
             id: self.id.unwrap_or_else(Uuid::new_v4),
             prizes: Vec::new(),
