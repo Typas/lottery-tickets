@@ -9,7 +9,7 @@ use crate::{prize::Prize, user::User};
 pub struct Tickets<K, U, S = RandomState>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, K>,
+    for<'a> U: User<'a, Key = K>,
 {
     users: HashMap<K, U, S>,
     prizes: Vec<Prize>,
@@ -18,7 +18,7 @@ where
 impl<K, U> Tickets<K, U>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, K>,
+    for<'a> U: User<'a, Key = K>,
 {
     pub fn new() -> Self {
         Self {
@@ -38,7 +38,7 @@ where
 impl<K, U, S> Tickets<K, U, S>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, K>,
+    for<'a> U: User<'a, Key = K>,
     S: std::hash::BuildHasher + std::default::Default,
 {
     pub fn with_user_capacity_and_hasher(cap: usize, hasher: S) -> Self {
@@ -56,7 +56,7 @@ where
     }
 
     pub fn add_user<'a>(&mut self, user: U) -> Option<U> {
-        self.users.insert(user.move_key(), user)
+        self.users.insert(user.key(), user)
     }
 
     pub fn set_users<'a, C>(&mut self, users: C)
@@ -64,7 +64,7 @@ where
         C: IntoIterator<Item = U>,
     {
         self.users.clear();
-        self.users = users.into_iter().map(|u| (u.move_key(), u)).collect();
+        self.users = users.into_iter().map(|u| (u.key(), u)).collect();
     }
 
     pub fn add_prize(&mut self, prize: Prize) {
