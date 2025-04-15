@@ -132,21 +132,19 @@ where
             .iter()
             .map(|p| PriorityPrize::new(p.count(), p))
             .collect();
-        // begin indexes corresponding to users
-        let mut prize_count: usize = copied_prizes.iter().map(|pz| pz.priority).sum();
 
         // Shuffle multiple times, only dispatch best prize to the user.
         // Once the user has prize, isolate it from the lottery.
         // The worst case of shuffling would be O(n),
         // and each shuffling would take O(n) time.
         // Therefore, this results in a total of O(n^2) worse case.
-        while prize_count != 0 {
+        while copied_prizes.iter().any(|pz| pz.priority > 0) {
             let mut num_tickets_partial_sum: Vec<usize> =
-                Vec::with_capacity(self.users.values().skip_while(|u| u.has_prize()).count());
+                Vec::with_capacity(self.users.values().filter(|u| !u.has_prize()).count());
             let num_tickets = self
                 .users
                 .values()
-                .skip_while(|u| u.has_prize())
+                .filter(|u| !u.has_prize())
                 .fold(0, |c, u| {
                     num_tickets_partial_sum.push(c);
                     c + u.ticket_count()
@@ -166,7 +164,7 @@ where
             for (user, num_tickets_partial_sum_till_user) in self
                 .users
                 .values_mut()
-                .skip_while(|u| u.has_prize())
+                .filter(|u| !u.has_prize())
                 .zip(num_tickets_partial_sum)
             {
                 let num_tickets_partial_sum_till_after_user =
@@ -186,9 +184,6 @@ where
                     copied_prizes[idx].priority -= 1;
                 }
             }
-
-            // calcuate the remaining prizes
-            prize_count = copied_prizes.iter().map(|p| p.priority).sum();
         }
     }
 
