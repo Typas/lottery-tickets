@@ -86,18 +86,18 @@ where
         let total_count = 0;
         // begin indexes corresponding to users
         let mut user_begins: Vec<usize> = Vec::with_capacity(self.users.len());
-        self.users.values_mut().fold(total_count, |c, u| {
+        self.users.values().fold(total_count, |c, u| {
             user_begins.push(c);
             c + u.ticket_count()
         });
-        let range = 0..total_count;
-        let mut numbers: Vec<usize> = range.clone().collect();
 
-        // shuffle
-        for i in range.clone() {
-            let j = rng.random_range(range.clone());
-            numbers.swap(i, j);
-        }
+        let god_only_knows = {
+            // unique random number for each ticket of each user
+            use rand::seq::SliceRandom;
+            let mut ret = Vec::from_iter(0..total_count);
+            ret.shuffle(rng);
+            ret
+        };
 
         // dispatch prizes
         let prizes = &self.prizes; // thank you stack borrow
@@ -105,7 +105,7 @@ where
         for (user, begin) in self.users.values_mut().zip(user_begins) {
             let end = begin + user.ticket_count();
             for i in begin..end {
-                if let Some(p) = Self::check_prize(prizes, numbers[i]) {
+                if let Some(p) = Self::check_prize(prizes, god_only_knows[i]) {
                     heap.push(PriorityPrize::new(p, &prizes[p]));
                 }
             }
@@ -127,7 +127,7 @@ where
             .map(|p| PriorityPrize::new(p.count(), p))
             .collect();
         // begin indexes corresponding to users
-        let mut prize_count = copied_prizes.iter().fold(0, |c, pz| c + pz.priority);
+        let mut prize_count: usize = copied_prizes.iter().map(|pz| pz.priority).sum();
 
         // Shuffle multiple times, only dispatch best prize to the user.
         // Once the user has prize, isolate it from the lottery.
@@ -135,49 +135,54 @@ where
         // and each shuffling would take O(n) time.
         // Therefore, this results in a total of O(n^2) worse case.
         while prize_count != 0 {
-            let mut user_begins: Vec<usize> =
+            let mut num_tickets_partial_sum: Vec<usize> =
                 Vec::with_capacity(self.users.values().skip_while(|u| u.has_prize()).count());
-            let total_count =
-                self.users
-                    .values_mut()
-                    .skip_while(|u| u.has_prize())
-                    .fold(0, |c, u| {
-                        user_begins.push(c);
-                        c + u.ticket_count()
-                    });
-            let range = 0..total_count;
-            let mut numbers: Vec<usize> = range.clone().collect();
+            let num_tickets = self
+                .users
+                .values()
+                .skip_while(|u| u.has_prize())
+                .fold(0, |c, u| {
+                    num_tickets_partial_sum.push(c);
+                    c + u.ticket_count()
+                });
 
-            // shuffle
-            for i in range.clone() {
-                let j = rng.random_range(range.clone());
-                numbers.swap(i, j);
-            }
+            // unique random number for each ticket of each user
+            let god_only_knows = {
+                use rand::seq::SliceRandom;
+                let mut ret = Vec::from_iter(0..num_tickets);
+                ret.shuffle(rng);
+                ret
+            };
 
             // dispatch prizes
             let prizes = &self.prizes; // thank you stack borrow
-            let mut max_prize: Option<usize> = None;
-            for (user, begin) in self
+            let mut max_prize_idx: Option<usize> = None;
+            for (user, num_tickets_partial_sum_till_user) in self
                 .users
                 .values_mut()
                 .skip_while(|u| u.has_prize())
-                .zip(user_begins)
+                .zip(num_tickets_partial_sum)
             {
-                let end = begin + user.ticket_count();
-                for i in begin..end {
-                    if let Some(p) = Self::check_copied_prize(&copied_prizes, numbers[i]) {
-                        max_prize = Some(max_prize.map_or(p, |mp| mp.min(p)));
+                let num_tickets_partial_sum_till_after_user =
+                    num_tickets_partial_sum_till_user + user.ticket_count();
+                for i in num_tickets_partial_sum_till_user..num_tickets_partial_sum_till_after_user
+                {
+                    if let Some(prize_idx) =
+                        Self::check_copied_prize(&copied_prizes, god_only_knows[i])
+                    {
+                        max_prize_idx =
+                            Some(max_prize_idx.map_or(prize_idx, |mp| mp.min(prize_idx)));
                     }
                 }
 
-                if let Some(p) = max_prize {
-                    user.add_prize(&prizes[p]);
-                    copied_prizes[p].priority -= 1;
+                if let Some(idx) = max_prize_idx {
+                    user.add_prize(&prizes[idx]);
+                    copied_prizes[idx].priority -= 1;
                 }
             }
 
             // calcuate the remaining prizes
-            prize_count = copied_prizes.iter().fold(0, |c, p| c + p.priority);
+            prize_count = copied_prizes.iter().map(|p| p.priority).sum();
         }
     }
 
