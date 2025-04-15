@@ -10,10 +10,7 @@ pub struct PrizeBuilder {
 
 impl Prize {
     pub fn new(name: String, count: usize) -> Self {
-        Self {
-            name,
-            count,
-        }
+        Self { name, count }
     }
 
     pub fn name(&self) -> &str {
