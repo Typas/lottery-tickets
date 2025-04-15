@@ -11,7 +11,9 @@ where
     K: Hash + Eq,
     for<'a> U: User<'a, Key = K>,
 {
+    // The users in a hash map, use .users() to get the result
     users: HashMap<K, U, S>,
+    // The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
 }
 
@@ -79,66 +81,26 @@ where
         self.prizes = prizes.into_iter().collect();
     }
 
+    pub fn users(&self) -> std::collections::hash_map::Values<'_, K, U> {
+        self.users.values()
+    }
+
+    pub fn users_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, U> {
+        self.users.values_mut()
+    }
+
     pub fn shuffle<R>(&mut self, rng: &mut R)
     where
         R: Rng,
     {
-        let num_total_tickets = 0;
-        // begin indexes corresponding to users
-        let mut num_tickets_partial_sums_till_user: Vec<usize> =
-            Vec::with_capacity(self.users.len());
-        self.users.values().fold(num_total_tickets, |c, u| {
-            num_tickets_partial_sums_till_user.push(c);
-            c + u.ticket_count()
-        });
-
-        let god_only_knows = {
-            // unique random number for each ticket of each user
-            use rand::seq::SliceRandom;
-            let mut ret = Vec::from_iter(0..num_total_tickets);
-            ret.shuffle(rng);
-            ret
-        };
-
-        // dispatch prizes
-        let prizes = &self.prizes; // thank you stack borrow
-        for (user, num_tickets_partial_sum_till_user) in self
-            .users
-            .values_mut()
-            .zip(num_tickets_partial_sums_till_user)
-        {
-            let mut heap = BinaryHeap::new();
-            let num_tickets_partial_sum_till_after_user =
-                num_tickets_partial_sum_till_user + user.ticket_count();
-            for i in num_tickets_partial_sum_till_user..num_tickets_partial_sum_till_after_user {
-                if let Some(idx_prize) = Self::check_prize(prizes, god_only_knows[i]) {
-                    heap.push(idx_prize);
-                }
-            }
-            // heap guaranteed the priority, but introduces extra O(k) complexity
-            heap.into_iter().for_each(|idx| {
-                user.add_prize(&self.prizes[idx]);
-            });
-        }
-    }
-
-    pub fn one_prize_per_user_shuffle<R>(&mut self, rng: &mut R)
-    where
-        R: Rng,
-    {
-        // "priority" here is actually the count
-        let mut copied_prizes: Vec<_> = self
-            .prizes
-            .iter()
-            .map(|p| PriorityPrize::new(p.count(), p))
-            .collect();
+        let mut prize_counts: Vec<_> = self.prizes.iter().map(|p| p.count()).collect();
 
         // Shuffle multiple times, only dispatch best prize to the user.
         // Once the user has prize, isolate it from the lottery.
         // The worst case of shuffling would be O(n),
         // and each shuffling would take O(n) time.
         // Therefore, this results in a total of O(n^2) worse case.
-        while copied_prizes.iter().any(|pz| pz.priority > 0) {
+        while prize_counts.iter().any(|pc| *pc > 0) {
             let mut num_tickets_partial_sum: Vec<usize> =
                 Vec::with_capacity(self.users.values().filter(|u| !u.has_prize()).count());
             let num_tickets = self
@@ -159,93 +121,80 @@ where
             };
 
             // dispatch prizes
-            let prizes = &self.prizes; // thank you stack borrow
-            let mut max_prize_idx: Option<usize> = None;
             for (user, num_tickets_partial_sum_till_user) in self
                 .users
                 .values_mut()
                 .filter(|u| !u.has_prize())
                 .zip(num_tickets_partial_sum)
             {
+                // extra O(k) to ensure the user would always get the largest ones
+                let mut heap = BinaryHeap::new();
                 let num_tickets_partial_sum_till_after_user =
                     num_tickets_partial_sum_till_user + user.ticket_count();
                 for i in num_tickets_partial_sum_till_user..num_tickets_partial_sum_till_after_user
                 {
                     if let Some(prize_idx) =
-                        Self::check_copied_prize(&copied_prizes, god_only_knows[i])
+                        Self::check_prize(&prize_counts, god_only_knows[i])
                     {
-                        max_prize_idx =
-                            Some(max_prize_idx.map_or(prize_idx, |mp| mp.min(prize_idx)));
+                        heap.push(prize_idx);
                     }
                 }
 
-                if let Some(idx) = max_prize_idx {
-                    user.add_prize(&prizes[idx]);
-                    copied_prizes[idx].priority -= 1;
+                // release extra prizes
+                while let Some(idx) = heap.pop() {
+                    if !user.add_prize(&self.prizes[idx]) {
+                        break;
+                    }
+                    prize_counts[idx] -= 1;
                 }
             }
         }
     }
 
-    pub fn users(&self) -> std::collections::hash_map::Values<'_, K, U> {
-        self.users.values()
-    }
-
-    pub fn users_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, U> {
-        self.users.values_mut()
-    }
-
-    fn check_prize(prizes: &[Prize], mut n: usize) -> Option<usize> {
-        for (i, prize) in prizes.iter().enumerate() {
-            if n < prize.count() {
+    fn check_prize(prize_counts: &[usize], mut n: usize) -> Option<usize> {
+        for (i, prize_count) in prize_counts.iter().enumerate() {
+            if n < *prize_count {
                 return Some(i);
             }
-            n -= prize.count();
-        }
-        None
-    }
-
-    fn check_copied_prize(prizes: &[PriorityPrize], mut n: usize) -> Option<usize> {
-        for (i, prize) in prizes.iter().enumerate() {
-            if n < prize.priority {
-                return Some(i);
-            }
-            n -= prize.priority;
+            n -= *prize_count;
         }
         None
     }
 }
 
-struct PriorityPrize<'a> {
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+struct PrizeCounter {
     priority: usize,
-    reference: &'a Prize,
+    count: usize,
 }
 
-impl<'a> PriorityPrize<'a> {
-    fn new(priority: usize, reference: &'a Prize) -> Self {
+#[allow(dead_code)]
+impl PrizeCounter {
+    fn new(priority: usize, count: usize) -> Self {
         Self {
             priority,
-            reference,
+            count,
         }
     }
 }
 
-impl<'a> Ord for PriorityPrize<'a> {
+impl Ord for PrizeCounter {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.priority.cmp(&other.priority)
     }
 }
 
-impl<'a> PartialOrd for PriorityPrize<'a> {
+impl PartialOrd for PrizeCounter {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.priority.partial_cmp(&other.priority)
     }
 }
 
-impl<'a> PartialEq for PriorityPrize<'a> {
+impl PartialEq for PrizeCounter {
     fn eq(&self, other: &Self) -> bool {
         self.priority.eq(&other.priority)
     }
 }
 
-impl<'a> Eq for PriorityPrize<'a> {}
+impl Eq for PrizeCounter {}
