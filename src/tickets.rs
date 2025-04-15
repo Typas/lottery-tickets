@@ -83,36 +83,42 @@ where
     where
         R: Rng,
     {
-        let total_count = 0;
+        let num_total_tickets = 0;
         // begin indexes corresponding to users
-        let mut user_begins: Vec<usize> = Vec::with_capacity(self.users.len());
-        self.users.values().fold(total_count, |c, u| {
-            user_begins.push(c);
+        let mut num_tickets_partial_sums_till_user: Vec<usize> =
+            Vec::with_capacity(self.users.len());
+        self.users.values().fold(num_total_tickets, |c, u| {
+            num_tickets_partial_sums_till_user.push(c);
             c + u.ticket_count()
         });
 
         let god_only_knows = {
             // unique random number for each ticket of each user
             use rand::seq::SliceRandom;
-            let mut ret = Vec::from_iter(0..total_count);
+            let mut ret = Vec::from_iter(0..num_total_tickets);
             ret.shuffle(rng);
             ret
         };
 
         // dispatch prizes
         let prizes = &self.prizes; // thank you stack borrow
-        let mut heap = BinaryHeap::new();
-        for (user, begin) in self.users.values_mut().zip(user_begins) {
-            let end = begin + user.ticket_count();
-            for i in begin..end {
-                if let Some(p) = Self::check_prize(prizes, god_only_knows[i]) {
-                    heap.push(PriorityPrize::new(p, &prizes[p]));
+        for (user, num_tickets_partial_sum_till_user) in self
+            .users
+            .values_mut()
+            .zip(num_tickets_partial_sums_till_user)
+        {
+            let mut heap = BinaryHeap::new();
+            let num_tickets_partial_sum_till_after_user =
+                num_tickets_partial_sum_till_user + user.ticket_count();
+            for i in num_tickets_partial_sum_till_user..num_tickets_partial_sum_till_after_user {
+                if let Some(idx_prize) = Self::check_prize(prizes, god_only_knows[i]) {
+                    heap.push(idx_prize);
                 }
             }
             // heap guaranteed the priority, but introduces extra O(k) complexity
-            while let Some(pp) = heap.pop() {
-                user.add_prize(pp.reference);
-            }
+            heap.into_iter().for_each(|idx| {
+                user.add_prize(&self.prizes[idx]);
+            });
         }
     }
 
