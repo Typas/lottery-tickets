@@ -4,7 +4,7 @@ pub struct Prize {
 }
 
 pub struct PrizeBuilder {
-    name: String,
+    name: Option<String>,
     count: usize,
 }
 
@@ -28,13 +28,13 @@ impl Prize {
 impl PrizeBuilder {
     pub fn new() -> Self {
         Self {
-            name: String::new(),
+            name: None,
             count: 1,
         }
     }
 
     pub fn name(mut self, name: String) -> Self {
-        self.name = name;
+        self.name = Some(name);
         self
     }
 
@@ -45,7 +45,7 @@ impl PrizeBuilder {
 
     pub fn build(self) -> Prize {
         Prize {
-            name: self.name,
+            name: self.name.unwrap_or_default(),
             count: self.count,
         }
     }
