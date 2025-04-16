@@ -1,6 +1,6 @@
+pub mod prize;
 pub mod tickets;
 pub mod user;
-pub mod prize;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

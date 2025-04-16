@@ -24,10 +24,7 @@ impl Prize {
 
 impl PrizeBuilder {
     pub fn new() -> Self {
-        Self {
-            name: None,
-            count: 1,
-        }
+        Self { name: None, count: 1 }
     }
 
     pub fn name(mut self, name: String) -> Self {
