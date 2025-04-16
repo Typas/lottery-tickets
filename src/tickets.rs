@@ -115,16 +115,14 @@ where
         R: Rng,
     {
         use std::iter::repeat_n;
-        // Shuffle twice would cause double spend
+        // Shuffle twice would cause double spend.
         if self.shuffled {
             return;
         }
 
-        // Shuffle the slots, only give the best prize to the user.
-        // Once the user has prize, isolate it from the lottery.
-        // The worst case of shuffling would be O(n),
-        // and each shuffling would take O(n) time.
-        // Therefore, this results in a total of O(n^2) worse case.
+        // Shuffle the slots, each user has `user.ticket_count()` slots.
+        // Use the user's key to point back to itself.
+        // The complexity shuffling would be both O(n).
         let tickets_god_only_knows_which_user = {
             use rand::seq::SliceRandom;
             let mut ret = Vec::from_iter(
@@ -145,7 +143,7 @@ where
             ret
         };
 
-        // map the prize to user
+        // Map the prize to user, the overall time complexity would be O(k)
         // once the key-mapped user has been saturated, try next user
         // For example, let's call `this.prizes[i]` `pi`, `this.users.keys()[i]` `ki`.
         // `p0.count = 1`, `p1.count = 2`, `p2.count = 3`.
@@ -162,6 +160,9 @@ where
         let mut tickets = tickets_god_only_knows_which_user.into_iter();
         while let Some(prize) = prizes.next() {
             while let Some(ticket) = tickets.next() {
+                // It is possible to use raw pointer to reduce both key production and hashing costs.
+                // However, it requires unsafe.
+                // Fortunately, this is not recursive, and relative simple to check the boundary.
                 if self.users.get_mut(&ticket).unwrap().add_prize(prize) {
                     break;
                 }
