@@ -93,72 +93,44 @@ where
     where
         R: Rng,
     {
-        let mut prize_counts: Vec<_> = self.prizes.iter().map(|p| p.count()).collect();
+        use std::cell::RefCell;
+        use std::iter::repeat_n;
+        use std::rc::Rc;
 
         // Shuffle multiple times, only dispatch best prize to the user.
         // Once the user has prize, isolate it from the lottery.
         // The worst case of shuffling would be O(n),
         // and each shuffling would take O(n) time.
         // Therefore, this results in a total of O(n^2) worse case.
-        while prize_counts.iter().any(|pc| *pc > 0) {
-            let mut num_tickets_partial_sum: Vec<usize> =
-                Vec::with_capacity(self.users.values().filter(|u| !u.has_prize()).count());
-            let num_tickets = self
-                .users
-                .values()
-                .filter(|u| !u.has_prize())
-                .fold(0, |c, u| {
-                    num_tickets_partial_sum.push(c);
-                    c + u.ticket_count()
-                });
-
-            // unique random number for each ticket of each user
-            let god_only_knows = {
-                use rand::seq::SliceRandom;
-                let mut ret = Vec::from_iter(0..num_tickets);
-                ret.shuffle(rng);
-                ret
-            };
-
-            // dispatch prizes
-            for (user, num_tickets_partial_sum_till_user) in self
-                .users
-                .values_mut()
-                .filter(|u| !u.has_prize())
-                .zip(num_tickets_partial_sum)
-            {
-                // extra O(k) to ensure the user would always get the largest ones
-                let mut heap = BinaryHeap::new();
-                let num_tickets_partial_sum_till_after_user =
-                    num_tickets_partial_sum_till_user + user.ticket_count();
-                for i in num_tickets_partial_sum_till_user..num_tickets_partial_sum_till_after_user
-                {
-                    if let Some(prize_idx) =
-                        Self::check_prize(&prize_counts, god_only_knows[i])
-                    {
-                        heap.push(prize_idx);
-                    }
-                }
-
-                // release extra prizes
-                while let Some(idx) = heap.pop() {
-                    if !user.add_prize(&self.prizes[idx]) {
-                        break;
-                    }
-                    prize_counts[idx] -= 1;
+        let tickets_god_only_knows_which_user = {
+            use rand::seq::SliceRandom;
+            let mut ret = Vec::from_iter(
+                self.users
+                    .values_mut()
+                    .map(RefCell::new)
+                    .map(Rc::new)
+                    .flat_map(|rc| repeat_n(rc.clone(), rc.borrow().ticket_count())),
+            );
+            ret.shuffle(rng);
+            ret
+        };
+        let mut prizes = self.prizes.iter().flat_map(|p| repeat_n(p, p.count()));
+        let mut tickets = tickets_god_only_knows_which_user.into_iter();
+        while let Some(prize) = prizes.next() {
+            while let Some(ticket) = tickets.next() {
+                // `Rc<RefCell<T>>` FTW
+                //
+                // Pros:
+                // easy mode lifetime around `&mut`
+                //
+                // Cons:
+                // 1. may prove troublesome if concurrent version were required
+                // 2. runtime overhead
+                if ticket.borrow_mut().add_prize(prize) {
+                    break;
                 }
             }
         }
-    }
-
-    fn check_prize(prize_counts: &[usize], mut n: usize) -> Option<usize> {
-        for (i, prize_count) in prize_counts.iter().enumerate() {
-            if n < *prize_count {
-                return Some(i);
-            }
-            n -= *prize_count;
-        }
-        None
     }
 }
 
@@ -172,10 +144,7 @@ struct PrizeCounter {
 #[allow(dead_code)]
 impl PrizeCounter {
     fn new(priority: usize, count: usize) -> Self {
-        Self {
-            priority,
-            count,
-        }
+        Self { priority, count }
     }
 }
 
