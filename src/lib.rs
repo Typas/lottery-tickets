@@ -1,6 +1,7 @@
 pub mod prize;
 pub mod tickets;
 pub mod user;
+mod random_picker;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
