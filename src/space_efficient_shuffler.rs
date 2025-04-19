@@ -169,6 +169,10 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
         loop {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
+
+            // if no prizes, just bail out with error
+            let Some(prize) = prizes.peek() else { return false };
+
             match &self.binary_tree[idx] {
                 BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 BinaryTreeNode::One { descendant_idx } => {
@@ -208,8 +212,6 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                     let BinaryTreeNode::Leaf(u) = &mut self.binary_tree[idx] else {
                         panic!()
                     };
-                    // if no prizes, just bail out with error
-                    let Some(prize) = prizes.peek() else { return false };
                     let ticket_count = u.ticket_count();
                     if ticket_count > 0 && u.add_prize(prize) {
                         // only advance the iterator if we're sure `impl User` takes it just fine
