@@ -7,6 +7,13 @@ pub(crate) struct SpaceEfficientShuffler<'prize, 'u, U>
 where
     'prize: 'u,
 {
+    /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete user.
+    ///
+    /// All nodes are token for some subset of users.
+    /// Children of a node are partitions of that node:
+    /// they are disjoint subsets of the node and union of children is the node itself.
+    ///
+    /// See also `BinaryTreeNode`.
     binary_tree: Vec<BinaryTreeNode<'u, U>>,
     _marker: PhantomData<&'prize ()>,
 }
@@ -14,7 +21,8 @@ where
 #[derive(Debug)]
 enum BinaryTreeNode<'u, U> {
     /// Either initialization stub, or `Leaf` just got purged after `SpaceEfficientShuffler::draw_one`.
-    /// See also `SpaceEfficientShuffler::cleanup_after_purge_node`
+    /// See also `SpaceEfficientShuffler::cleanup_after_purge_node`.
+    /// A transient state: no valid node would be such that both its children are `None`.
     None,
     /// Artifact of both `SpaceEfficientShuffler::draw_one` and `SpaceEfficientShuffler::cleanup_after_purge_node`:
     /// exactly one of its children is `None`,
@@ -32,7 +40,7 @@ enum BinaryTreeNode<'u, U> {
     },
     /// This node has two children.
     Two {
-        sum: usize,
+        total_tickets_of_subtree: usize,
     },
     Leaf(&'u mut U),
 }
@@ -43,15 +51,19 @@ where
 {
     const ERR_DATA_INCONSISTENT: &'static str = "Data strucutre inconsistent";
 
+    /// Use with caution: do not call on leaves!
     fn left(u: usize) -> NonZeroUsize {
         NonZeroUsize::new(u * 2 + 1).unwrap()
     }
+    /// Use with caution: do not call on leaves!
     fn right(u: usize) -> NonZeroUsize {
         NonZeroUsize::new(u * 2 + 2).unwrap()
     }
+    /// Return `None` if already root i.e. input `0`.
     fn parent(u: usize) -> Option<usize> {
         u.checked_sub(1).map(|i| i / 2)
     }
+    /// Use with caution: is the sibling actually valid?
     fn sibling(u: NonZeroUsize) -> NonZeroUsize {
         let u = u.get();
         NonZeroUsize::new(u - 1 + (u % 2) * 2).unwrap()
@@ -97,16 +109,30 @@ where
                 match (&v[SES::<U>::left(i).get()], &v[SES::<U>::right(i).get()]) {
                     (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
                         v[i] = BinaryTreeNode::Two {
-                            sum: l.ticket_count() + r.ticket_count(),
+                            total_tickets_of_subtree: l.ticket_count() + r.ticket_count(),
                         }
                     },
-                    (BinaryTreeNode::Two { sum }, BinaryTreeNode::Leaf(u)) => {
+                    (
+                        BinaryTreeNode::Two {
+                            total_tickets_of_subtree: sum,
+                        },
+                        BinaryTreeNode::Leaf(u),
+                    ) => {
                         v[i] = BinaryTreeNode::Two {
-                            sum: sum + u.ticket_count(),
+                            total_tickets_of_subtree: sum + u.ticket_count(),
                         }
                     },
-                    (BinaryTreeNode::Two { sum: l }, BinaryTreeNode::Two { sum: r }) => {
-                        v[i] = BinaryTreeNode::Two { sum: l + r }
+                    (
+                        BinaryTreeNode::Two {
+                            total_tickets_of_subtree: l,
+                        },
+                        BinaryTreeNode::Two {
+                            total_tickets_of_subtree: r,
+                        },
+                    ) => {
+                        v[i] = BinaryTreeNode::Two {
+                            total_tickets_of_subtree: l + r,
+                        }
                     },
                     _ => {
                         panic!("Not a complete binary tree!");
@@ -173,6 +199,25 @@ where
                     };
                     idx = next_interesting_idx;
                 },
+                BinaryTreeNode::Two {
+                    total_tickets_of_subtree: sum,
+                } => {
+                    let left = Self::left(idx);
+                    let left_ticket_count = self.get_key_count_at_idx(left);
+                    // We're relying on the tree invariant that a `BinaryTreeNode::Two` node
+                    // contains the total sum of tickets of both of its children.
+                    // (See also `SpaceEfficientShuffler` and `BinaryTreeNode::Two`)
+                    //
+                    // Say left has L tickets, right has R tickets, we know `sum` is just (L+R),
+                    // then a fair choice is simply generate a random number G (uniformly) between 0 and (L+R),
+                    // and if G less than L, we choose the left subset,
+                    // otherwise we choose the right subset.
+                    idx = if rng.random_range(..*sum) < left_ticket_count {
+                        left.get()
+                    } else {
+                        Self::right(idx).get()
+                    };
+                },
                 BinaryTreeNode::Leaf(..) => {
                     let BinaryTreeNode::Leaf(u) = &mut self.binary_tree[idx] else {
                         panic!()
@@ -201,15 +246,6 @@ where
                         }
                     }
                 },
-                BinaryTreeNode::Two { sum } => {
-                    let left = Self::left(idx);
-                    let left_ticket_count = self.get_key_count_at_idx(left);
-                    idx = if rng.random_range(..*sum) < left_ticket_count {
-                        left.get()
-                    } else {
-                        Self::right(idx).get()
-                    };
-                },
             }
         }
     }
@@ -217,7 +253,9 @@ where
     fn get_key_count_at_idx(&self, mut idx: NonZeroUsize) -> usize {
         loop {
             match &self.binary_tree[idx.get()] {
-                BinaryTreeNode::Two { sum } => break *sum,
+                BinaryTreeNode::Two {
+                    total_tickets_of_subtree: sum,
+                } => break *sum,
                 BinaryTreeNode::One { descendant_idx } => idx = *descendant_idx,
                 BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 BinaryTreeNode::Leaf(u) => break u.ticket_count(),
@@ -232,7 +270,10 @@ where
     fn decrease_tickets_count(&mut self, mut idx: usize, ticket_count: usize) {
         while let Some(parent) = Self::parent(idx) {
             idx = parent;
-            if let BinaryTreeNode::Two { sum } = &mut self.binary_tree[parent] {
+            if let BinaryTreeNode::Two {
+                total_tickets_of_subtree: sum,
+            } = &mut self.binary_tree[parent]
+            {
                 *sum -= ticket_count;
             }
         }

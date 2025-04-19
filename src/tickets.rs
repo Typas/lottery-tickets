@@ -136,9 +136,7 @@ where
             .ok()
             .flatten()
             .is_some()
-        {
-            tracing::info!("a prize were distributed!");
-        }
+        {}
     }
 
     /// Shuffle the slots and distribute the prizes to the users.
