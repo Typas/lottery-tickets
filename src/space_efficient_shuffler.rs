@@ -173,7 +173,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
             match &self.binary_tree[idx] {
-                BinaryTreeNode::None => return false,
+                BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 BinaryTreeNode::One { descendant_idx } => {
                     let mut next_interesting_idx = descendant_idx.get();
                     while let BinaryTreeNode::One {
@@ -230,8 +230,17 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                             // restart from root all over again,
                             // for all the probabilities based on which we choose path
                             // traversing down the tree are wrong.
-                            idx = 0;
-                            continue; // not necessary, just clarifying retrying from root
+                            if let BinaryTreeNode::None = &self.binary_tree[0] {
+                                // we've depleted the users/tickets;
+                                // bail out since we don't allow root to be
+                                // `BinaryTreeNode::None`,
+                                // but we're in an awkward case caused by the
+                                // `SpaceEfficientShuffler::cleanup_after_purge_node`.
+                                return false;
+                            } else {
+                                idx = 0;
+                                continue; // not necessary, just clarifying retrying from root
+                            }
                         } else {
                             // the index is just zero, meaning the leaf is also root,
                             // no more users available, just return error
