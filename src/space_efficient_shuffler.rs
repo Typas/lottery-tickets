@@ -280,7 +280,6 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
     /// The input index should point to `BinaryTreeNode::None`.
     /// The ticket counters are assumed to be valid and thus _not_ modified.
     fn cleanup_after_purge_node(&mut self, mut i: usize) {
-        use crate::space_efficient_shuffler::SpaceEfficientShuffler as SES;
         while let (Some(parent_idx), BinaryTreeNode::None) = (Self::parent(i), &self.binary_tree[i]) {
             match &mut self.binary_tree[parent_idx] {
                 BinaryTreeNode::None | BinaryTreeNode::Leaf(_) => panic!("{}", Self::ERR_DATA_INCONSISTENT),
@@ -299,7 +298,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                     *two = BinaryTreeNode::One {
                         // `Option::unwrap` safety:
                         // this node has two children, meaning we must have sibling
-                        descendant_idx: SES::<U>::sibling(NonZeroUsize::new(i).unwrap()),
+                        descendant_idx: Self::sibling(NonZeroUsize::new(i).unwrap()),
                     };
                     break;
                 },
