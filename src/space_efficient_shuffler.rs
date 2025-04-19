@@ -232,6 +232,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                             // for all the probabilities based on which we choose path
                             // traversing down the tree are wrong.
                             idx = 0;
+                            continue; // not necessary, just clarifying retrying from root
                         } else {
                             // the index is just zero, meaning the leaf is also root,
                             // no more users available, just return error
