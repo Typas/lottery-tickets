@@ -176,12 +176,9 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                 BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 BinaryTreeNode::One { descendant_idx } => {
                     let mut next_interesting_idx = descendant_idx.get();
-                    while let BinaryTreeNode::One {
-                        descendant_idx: further_descendant_idx,
-                    } = &self.binary_tree[next_interesting_idx]
-                    {
+                    while let BinaryTreeNode::One { descendant_idx } = &self.binary_tree[next_interesting_idx] {
                         // try jump further
-                        next_interesting_idx = further_descendant_idx.get();
+                        next_interesting_idx = descendant_idx.get();
                     }
                     self.binary_tree[idx] = BinaryTreeNode::One {
                         descendant_idx: NonZeroUsize::new(next_interesting_idx).unwrap(),
