@@ -1,19 +1,17 @@
-#![allow(unused)]
-
 use std::{iter::Peekable, num::NonZeroUsize};
 
 use crate::{prize::Prize, user::User};
 use rand::Rng;
-pub(crate) struct RandomPicker<'u, U> {
+pub(crate) struct SpaceEfficientShuffler<'u, U> {
     binary_tree: Vec<BinaryTreeNode<'u, U>>,
 }
 
 #[derive(Debug)]
 enum BinaryTreeNode<'u, U> {
-    /// Either initialization stub, or `Leaf` just got purged after `RandomPicker::draw_one`.
-    /// See also `RandomPicker::cleanup_after_purge_node`
+    /// Either initialization stub, or `Leaf` just got purged after `SpaceEfficientShuffler::draw_one`.
+    /// See also `SpaceEfficientShuffler::cleanup_after_purge_node`
     None,
-    /// Artifact of both `RandomPicker::draw_one` and `RandomPicker::cleanup_after_purge_node`:
+    /// Artifact of both `SpaceEfficientShuffler::draw_one` and `SpaceEfficientShuffler::cleanup_after_purge_node`:
     /// exactly one of its children is empty,
     /// the `descendant_idx` points us to the next interesting descendant.
     One {
@@ -32,7 +30,7 @@ enum BinaryTreeNode<'u, U> {
     Leaf(&'u mut U),
 }
 
-impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
+impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
     const ERR_DATA_INCONSISTENT: &'static str = "Data strucutre inconsistent";
 
     fn left(u: usize) -> NonZeroUsize {
@@ -49,7 +47,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
         NonZeroUsize::new(u - 1 + (u % 2) * 2).unwrap()
     }
 
-    /// Make `RandomPicker::binary_tree` a _complete binary tree_,
+    /// Make `SpaceEfficientShuffler::binary_tree` a _complete binary tree_,
     /// in which all internal nodes are `BinaryTreeNode::Two`,
     /// and all leaf nodes are `BinaryTreeNode::Leaf`
     pub(crate) fn new(iter: impl IntoIterator<Item = &'u mut U>) -> Self {
@@ -76,7 +74,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
         ///
         /// Input should be valid indices only.
         fn init_at<U: for<'hrtb> User<'hrtb>>(i: usize, v: &mut [BinaryTreeNode<U>]) {
-            use crate::random_picker::RandomPicker as RP;
+            use crate::space_efficient_shuffler::SpaceEfficientShuffler as RP;
             if let BinaryTreeNode::None = &v[i] {
                 // During initialization, `None` iff internal node,
                 // and being a complete tree, internal nodes have both childrens,
@@ -234,7 +232,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
     /// The input index should point to `BinaryTreeNode::None`.
     /// The ticket counters are assumed to be valid and thus _not_ modified.
     fn cleanup_after_purge_node(&mut self, mut i: NonZeroUsize) {
-        use crate::random_picker::RandomPicker as RP;
+        use crate::space_efficient_shuffler::SpaceEfficientShuffler as RP;
         while let BinaryTreeNode::None = &self.binary_tree[i.get()] {
             match &mut self.binary_tree[Self::parent(i)] {
                 BinaryTreeNode::None | BinaryTreeNode::Leaf(_) => panic!("{}", Self::ERR_DATA_INCONSISTENT),
@@ -251,7 +249,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
                 },
                 two @ &mut BinaryTreeNode::Two { .. } => {
                     // Lazy: we don't care if the sibling is `BinaryTreeNode::One`,
-                    // for the `RandomPicker` would trim them as they see fit:
+                    // for the `SpaceEfficientShuffler` would trim them as they see fit:
                     // if that sibling has few tickets, it might not be accessed ever again anyway
                     *two = BinaryTreeNode::One {
                         descendant_idx: RP::<U>::sibling(i),

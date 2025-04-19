@@ -5,7 +5,7 @@ use std::{
 
 use rand::Rng;
 
-use crate::{prize::Prize, random_picker, user::User};
+use crate::{prize::Prize, space_efficient_shuffler, user::User};
 pub struct Tickets<K, U, S = RandomState>
 where
     K: Hash + Eq,
@@ -114,7 +114,8 @@ where
             return;
         }
         self.shuffled = true;
-        let mut space_efficient_shuffler = random_picker::RandomPicker::new(self.users.values_mut());
+        let mut space_efficient_shuffler =
+            space_efficient_shuffler::SpaceEfficientShuffler::new(self.users.values_mut());
         let mut prizes = self.prizes.iter().peekable();
         while let Some(_) = space_efficient_shuffler.draw_one(rng, &mut prizes).ok().flatten() {
             tracing::info!("a prize were distributed!");
