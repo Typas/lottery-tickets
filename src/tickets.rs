@@ -8,17 +8,22 @@ use std::{
 use rand::Rng;
 
 use crate::{prize::Prize, space_efficient_shuffler, user::User};
-pub struct Tickets<'u, K, U, S = RandomState>
+pub struct Tickets<'user, K, U, S = RandomState>
 where
     K: Hash + Eq,
-    U: User<'u, Key = K>,
+    U: User<'user, Key = K>,
 {
     shuffled: bool,
     // The users in a hash map, use .users() to get the result
     users: HashMap<K, U, S>,
     // The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
-    _marker: PhantomData<&'u ()>,
+    /// The lifetime is actually refering to those `impl User` in the map,
+    /// which in turn is referring to `Prize` in this exact struct (`Self::prizes`)
+    ///
+    /// Rust complains if not explicitly used in any of the fields,
+    /// thus the marker.
+    _marker: PhantomData<&'user U>,
 }
 
 impl<'u, K, U> Tickets<'u, K, U>
@@ -116,9 +121,9 @@ where
         self.users.values_mut()
     }
 
-    pub fn shuffle_many_tickets<'me>(&'me mut self, rng: &mut impl Rng)
+    pub fn shuffle_many_tickets<'myself>(&'myself mut self, rng: &mut impl Rng)
     where
-        'me: 'u,
+        'myself: 'u,
     {
         if self.shuffled {
             return;
@@ -140,10 +145,10 @@ where
     }
 
     /// Shuffle the slots and distribute the prizes to the users.
-    pub fn shuffle<'me, R>(&'me mut self, rng: &mut R)
+    pub fn shuffle<'myself, R>(&'myself mut self, rng: &mut R)
     where
         R: Rng,
-        'me: 'u,
+        'myself: 'u,
     {
         use std::iter::repeat_n;
         // Shuffle twice would cause double spend.
