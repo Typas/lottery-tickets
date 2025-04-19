@@ -134,7 +134,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
     ///
     /// TODO
     /// implement entropy pool, maybe as simple as caching random numbers.
-    pub(crate) fn draw_one<'p>(
+    pub(crate) fn try_draw_one<'p>(
         &mut self,
         rng: &mut impl Rng,
         prizes: &mut Peekable<impl Iterator<Item = &'p Prize>>,
@@ -145,22 +145,19 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
             // TODO: refactor
             match &self.binary_tree[idx] {
                 BinaryTreeNode::None => Err(())?,
-                BinaryTreeNode::One {
-                    descendant_idx: nearer_descendant_idx,
-                } => {
-                    // perform the jump via preparing the index for next iteration
-                    let mut new_idx = nearer_descendant_idx.get();
-                    if let BinaryTreeNode::One {
+                BinaryTreeNode::One { descendant_idx } => {
+                    let mut next_interesting_idx = descendant_idx.get();
+                    while let BinaryTreeNode::One {
                         descendant_idx: further_descendant_idx,
-                    } = &self.binary_tree[nearer_descendant_idx.get()]
+                    } = &self.binary_tree[next_interesting_idx]
                     {
-                        // turns out we may jump further, record this fact.
-                        new_idx = further_descendant_idx.get();
-                        self.binary_tree[idx] = BinaryTreeNode::One {
-                            descendant_idx: *further_descendant_idx,
-                        };
+                        // try jump further
+                        next_interesting_idx = further_descendant_idx.get();
                     }
-                    idx = new_idx;
+                    self.binary_tree[idx] = BinaryTreeNode::One {
+                        descendant_idx: NonZeroUsize::new(next_interesting_idx).unwrap(),
+                    };
+                    idx = next_interesting_idx;
                 },
                 BinaryTreeNode::Leaf(..) => {
                     let BinaryTreeNode::Leaf(u) = &mut self.binary_tree[idx] else {

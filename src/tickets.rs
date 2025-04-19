@@ -118,7 +118,7 @@ where
             space_efficient_shuffler::SpaceEfficientShuffler::new(self.users.values_mut());
         let mut prizes = self.prizes.iter().peekable();
         while space_efficient_shuffler
-            .draw_one(rng, &mut prizes)
+            .try_draw_one(rng, &mut prizes)
             .ok()
             .flatten()
             .is_some()
