@@ -4,16 +4,16 @@ use std::{iter::Peekable, num::NonZeroUsize};
 
 use crate::{prize::Prize, user::User};
 use rand::Rng;
-struct RandomPicker<'u, U> {
+pub(crate) struct RandomPicker<'u, U> {
     binary_tree: Vec<BinaryTreeNode<'u, U>>,
 }
 
 #[derive(Debug)]
 enum BinaryTreeNode<'u, U> {
-    /// Either initialization stub, or `Leaf` user just got purged after `RandomPicker::draw_one`.
-    /// See also `RandomPicker::compactify`
+    /// Either initialization stub, or `Leaf` just got purged after `RandomPicker::draw_one`.
+    /// See also `RandomPicker::cleanup_after_purge_node`
     None,
-    /// Artifact of both `RandomPicker::draw_one` and `RandomPicker::compactify`:
+    /// Artifact of both `RandomPicker::draw_one` and `RandomPicker::cleanup_after_purge_node`:
     /// exactly one of its children is empty,
     /// the `descendant_idx` points us to the next interesting descendant.
     One {
@@ -116,7 +116,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
     /// till a node that is exactly one user is found.
     ///
     /// During the walk till the lucky user, we may find `BinaryTreeNode::One`,
-    /// which is residual from `Self::compactify`,
+    /// which is residual from `Self::cleanup_after_purge_node`,
     /// meaning exactly one of its left or right child/children is present,
     /// in which case we may try jump to next "interesting" descendant
     /// and record where we jumped via modifying the `BinaryTreeNode::One::descendant_idx`,
@@ -134,7 +134,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> RandomPicker<'u, U> {
     ///
     /// TODO
     /// implement entropy pool, maybe as simple as caching random numbers.
-    fn draw_one<'p>(
+    pub(crate) fn draw_one<'p>(
         &mut self,
         rng: &mut impl Rng,
         prizes: &mut Peekable<impl Iterator<Item = &'p Prize>>,

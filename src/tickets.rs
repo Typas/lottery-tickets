@@ -5,7 +5,7 @@ use std::{
 
 use rand::Rng;
 
-use crate::{prize::Prize, user::User};
+use crate::{prize::Prize, random_picker, user::User};
 pub struct Tickets<K, U, S = RandomState>
 where
     K: Hash + Eq,
@@ -107,6 +107,18 @@ where
     /// Returns the users, which are mutable.
     pub fn users_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, U> {
         self.users.values_mut()
+    }
+
+    pub fn shuffle_many_tickets(&mut self, rng: &mut impl Rng) {
+        if self.shuffled {
+            return;
+        }
+        self.shuffled = true;
+        let mut space_efficient_shuffler = random_picker::RandomPicker::new(self.users.values_mut());
+        let mut prizes = self.prizes.iter().peekable();
+        while let Some(_) = space_efficient_shuffler.draw_one(rng, &mut prizes).ok().flatten() {
+            tracing::info!("a prize were distributed!");
+        }
     }
 
     /// Shuffle the slots and distribute the prizes to the users.

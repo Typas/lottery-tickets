@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 rand = "0.9"
+tracing = "0.1.41"
 
 [dependencies.uuid]
 version = "1.16"
