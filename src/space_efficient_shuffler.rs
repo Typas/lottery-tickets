@@ -186,7 +186,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                     idx = next_interesting_idx;
                 },
                 BinaryTreeNode::Two {
-                    total_tickets_of_subtree: sum,
+                    total_tickets_of_subtree,
                 } => {
                     let left = Self::left(idx);
                     let left_ticket_count = self.get_key_count_at_idx(left);
@@ -198,7 +198,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                     // then a fair choice is simply generate a random number G (uniformly) between 0 and (L+R),
                     // and if G less than L, we choose the left subset,
                     // otherwise we choose the right subset.
-                    idx = if rng.random_range(..*sum) < left_ticket_count {
+                    idx = if rng.random_range(..*total_tickets_of_subtree) < left_ticket_count {
                         left.get()
                     } else {
                         Self::right(idx).get()
