@@ -173,7 +173,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
             match &self.binary_tree[idx] {
-                BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
+                BinaryTreeNode::None => return false,
                 BinaryTreeNode::One { descendant_idx } => {
                     let mut next_interesting_idx = descendant_idx.get();
                     while let BinaryTreeNode::One {
