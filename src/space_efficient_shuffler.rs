@@ -76,14 +76,14 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
         ///
         /// Input should be valid indices only.
         fn init_at<U: for<'hrtb> User<'hrtb>>(i: usize, v: &mut [BinaryTreeNode<U>]) {
-            use crate::space_efficient_shuffler::SpaceEfficientShuffler as RP;
+            use crate::space_efficient_shuffler::SpaceEfficientShuffler as SES;
             if let BinaryTreeNode::None = &v[i] {
                 // During initialization, `None` iff internal node,
                 // and being a complete tree, internal nodes have both childrens,
                 // thus here we may safely assume both left and right are still within boundary
-                init_at(RP::<U>::left(i).get(), v);
-                init_at(RP::<U>::right(i).get(), v);
-                match (&v[RP::<U>::left(i).get()], &v[RP::<U>::right(i).get()]) {
+                init_at(SES::<U>::left(i).get(), v);
+                init_at(SES::<U>::right(i).get(), v);
+                match (&v[SES::<U>::left(i).get()], &v[SES::<U>::right(i).get()]) {
                     (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
                         v[i] = BinaryTreeNode::Two {
                             sum: l.ticket_count() + r.ticket_count(),
@@ -231,7 +231,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
     /// The input index should point to `BinaryTreeNode::None`.
     /// The ticket counters are assumed to be valid and thus _not_ modified.
     fn cleanup_after_purge_node(&mut self, mut i: usize) {
-        use crate::space_efficient_shuffler::SpaceEfficientShuffler as RP;
+        use crate::space_efficient_shuffler::SpaceEfficientShuffler as SES;
         while let (Some(parent_idx), BinaryTreeNode::None) = (Self::parent(i), &self.binary_tree[i]) {
             match &mut self.binary_tree[parent_idx] {
                 BinaryTreeNode::None | BinaryTreeNode::Leaf(_) => panic!("{}", Self::ERR_DATA_INCONSISTENT),
@@ -250,7 +250,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
                     *two = BinaryTreeNode::One {
                         // `Option::unwrap` safety:
                         // this node has two children, meaning we must have sibling
-                        descendant_idx: RP::<U>::sibling(NonZeroUsize::new(i).unwrap()),
+                        descendant_idx: SES::<U>::sibling(NonZeroUsize::new(i).unwrap()),
                     };
                     break;
                 },
