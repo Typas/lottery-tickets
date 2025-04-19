@@ -222,26 +222,21 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                         // Do _not_ advance the iterator else we'll lose some prizes
                         self.decrease_tickets_count(idx, ticket_count);
                         self.binary_tree[idx] = BinaryTreeNode::None;
-                        if let Some(idx_of_purged_leaf) = NonZeroUsize::new(idx) {
-                            self.cleanup_after_purge_node(idx_of_purged_leaf.get());
+                        self.cleanup_after_purge_node(idx);
+                        if let BinaryTreeNode::None = &self.binary_tree[0] {
+                            // we've depleted the users/tickets;
+                            // bail out since we don't allow root to be
+                            // `BinaryTreeNode::None`,
+                            // but we're in an awkward case caused by either
+                            // 1. Tree has exactly one node s.t. root is leaf
+                            // 2. `SpaceEfficientShuffler::cleanup_after_purge_node`
+                            return false;
+                        } else {
                             // restart from root all over again,
                             // for all the probabilities based on which we choose path
                             // traversing down the tree are wrong.
-                            if let BinaryTreeNode::None = &self.binary_tree[0] {
-                                // we've depleted the users/tickets;
-                                // bail out since we don't allow root to be
-                                // `BinaryTreeNode::None`,
-                                // but we're in an awkward case caused by the
-                                // `SpaceEfficientShuffler::cleanup_after_purge_node`.
-                                return false;
-                            } else {
-                                idx = 0;
-                                continue; // not necessary, just clarifying retrying from root
-                            }
-                        } else {
-                            // the index is just zero, meaning the leaf is also root,
-                            // no more users available, just return error
-                            return false;
+                            idx = 0;
+                            continue; // not necessary, just clarifying retrying from root
                         }
                     }
                 },
