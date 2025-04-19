@@ -144,7 +144,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
             match &self.binary_tree[idx] {
-                BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
+                BinaryTreeNode::None => Err(())?,
                 BinaryTreeNode::One {
                     descendant_idx: nearer_descendant_idx,
                 } => {
