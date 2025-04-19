@@ -136,12 +136,7 @@ where
             .peekable();
         let mut space_efficient_shuffler =
             space_efficient_shuffler::SpaceEfficientShuffler::new(self.users.values_mut());
-        while space_efficient_shuffler
-            .try_draw_one(rng, &mut prizes)
-            .ok()
-            .flatten()
-            .is_some()
-        {}
+        while space_efficient_shuffler.try_draw_one(rng, &mut prizes) {}
     }
 
     /// Shuffle the slots and distribute the prizes to the users.
@@ -211,10 +206,34 @@ where
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::collections::BTreeSet;
 
     use super::Tickets;
     use crate::prize::PrizeBuilder;
-    use crate::test_utils::UserWithLog;
+    use crate::space_efficient_shuffler::SpaceEfficientShuffler;
+    use crate::test_utils::CapacityOneUser;
+    use crate::test_utils::GenericUser;
+
+    #[test]
+    fn test_space_efficient_shuffler_capacity_one_user() {
+        let mut rng = rand::rng();
+        const MAX_PRIZE_COUNT: usize = 100;
+        const NUM_USERS: usize = 65536;
+        let prizes =
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+        let (mut users, logs) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+        let mut ses = SpaceEfficientShuffler::new(&mut users);
+        let mut prizes = prizes.iter().peekable();
+        while ses.try_draw_one(&mut rng, &mut prizes) {}
+        assert_eq!(
+            BTreeSet::from_iter(logs.into_iter().flat_map(|u| {
+                assert!(u.borrow().len() == 0 || u.borrow().len() == 1);
+                Vec::from_iter(u.borrow().iter().map(|p| p.name()).map(String::from))
+            })),
+            BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
+        );
+    }
+
     #[test]
     fn test_space_efficient_shuffler() {
         let mut rng = rand::rng();
@@ -230,7 +249,7 @@ mod tests {
         };
         let (users, log) = (0..NUM_USERS)
             .into_iter()
-            .map(UserWithLog::new)
+            .map(GenericUser::new)
             .collect::<(Vec<_>, Vec<_>)>();
         let mut tickets = Tickets::new();
         prizes.into_iter().for_each(|p| tickets.add_prize(p));

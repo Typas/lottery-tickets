@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Prize {
     name: String,
     count: usize,

@@ -164,13 +164,13 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
         &mut self,
         rng: &mut impl Rng,
         prizes: &mut Peekable<impl Iterator<Item = &'u Prize>>,
-    ) -> Result<Option<&U>, ()> {
+    ) -> bool {
         let mut idx = 0;
         loop {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
             match &self.binary_tree[idx] {
-                BinaryTreeNode::None => Err(())?,
+                BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 BinaryTreeNode::One { descendant_idx } => {
                     let mut next_interesting_idx = descendant_idx.get();
                     while let BinaryTreeNode::One {
@@ -209,12 +209,13 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                         panic!()
                     };
                     // if no prizes, just bail out with error
-                    let prize = prizes.peek().ok_or(())?;
+                    let Some(prize) = prizes.peek() else { return false };
                     let ticket_count = u.ticket_count();
                     if ticket_count > 0 && u.add_prize(prize) {
                         // only advance the iterator if we're sure `impl User` takes it just fine
                         prizes.next();
                         self.decrease_tickets_count(idx, 1);
+                        return true;
                     } else {
                         // Assuming `User::add_prize` is monotone,
                         // in the sense once returned `false` it's always `false`,
@@ -225,10 +226,14 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
                         self.binary_tree[idx] = BinaryTreeNode::None;
                         if let Some(idx_of_purged_leaf) = NonZeroUsize::new(idx) {
                             self.cleanup_after_purge_node(idx_of_purged_leaf.get());
+                            // restart from root all over again,
+                            // for all the probabilities based on which we choose path
+                            // traversing down the tree are wrong.
+                            idx = 0;
                         } else {
                             // the index is just zero, meaning the leaf is also root,
                             // no more users available, just return error
-                            Err(())?
+                            return false;
                         }
                     }
                 },
