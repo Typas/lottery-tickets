@@ -207,23 +207,45 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use super::Tickets;
     use crate::prize::PrizeBuilder;
-    use crate::test_utils::SimpleUser;
+    use crate::test_utils::UserWithLog;
     #[test]
     fn test_space_efficient_shuffler() {
         let mut rng = rand::rng();
-        let prizes = Vec::from_iter(
-            (0..100)
-                .into_iter()
-                .map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()),
-        );
-        let users = Vec::from_iter((0..65536).into_iter().map(SimpleUser::new));
+        const MAX_PRIZE_COUNT: usize = 100;
+        const NUM_USERS: usize = 65536;
+        let (prizes, num_prizes) = {
+            let mut n = 0;
+            let ret = Vec::from_iter((0..MAX_PRIZE_COUNT).into_iter().map(|x| {
+                n += x;
+                PrizeBuilder::new().count(x).name(format!("{x}")).build()
+            }));
+            (ret, n)
+        };
+        let (users, log) = (0..NUM_USERS)
+            .into_iter()
+            .map(UserWithLog::new)
+            .collect::<(Vec<_>, Vec<_>)>();
         let mut tickets = Tickets::new();
         prizes.into_iter().for_each(|p| tickets.add_prize(p));
         users.into_iter().for_each(|u| {
             tickets.add_user(u);
         });
         tickets.shuffle_many_tickets(&mut rng);
+        assert_eq!(log.iter().map(|u| u.borrow().len()).sum::<usize>(), num_prizes);
+        (0..MAX_PRIZE_COUNT).into_iter().for_each(|i| {
+            let name = &format!("{i}");
+            assert_eq!(
+                log.iter()
+                    .map(|rc| &**rc)
+                    .map(RefCell::borrow)
+                    .map(|v| v.as_slice().iter().filter(|p| p.name() == name).count())
+                    .sum::<usize>(),
+                i
+            )
+        });
     }
 }
