@@ -117,7 +117,12 @@ where
         let mut space_efficient_shuffler =
             space_efficient_shuffler::SpaceEfficientShuffler::new(self.users.values_mut());
         let mut prizes = self.prizes.iter().peekable();
-        while let Some(_) = space_efficient_shuffler.draw_one(rng, &mut prizes).ok().flatten() {
+        while space_efficient_shuffler
+            .draw_one(rng, &mut prizes)
+            .ok()
+            .flatten()
+            .is_some()
+        {
             tracing::info!("a prize were distributed!");
         }
     }

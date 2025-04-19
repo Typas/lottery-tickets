@@ -12,18 +12,20 @@ enum BinaryTreeNode<'u, U> {
     /// See also `SpaceEfficientShuffler::cleanup_after_purge_node`
     None,
     /// Artifact of both `SpaceEfficientShuffler::draw_one` and `SpaceEfficientShuffler::cleanup_after_purge_node`:
-    /// exactly one of its children is empty,
-    /// the `descendant_idx` points us to the next interesting descendant.
+    /// exactly one of its children is `None`,
+    /// and `descendant_idx` points us towards the next interesting descendant.
     One {
-        /// At times there might be subtree that form a pure linked list,
-        /// comprised only of consecutive `One`, except the end node being `Two` or `Leaf`,
+        /// At times there might be path in the tree that forms a linked list,
+        /// in the sense that except for the tail they all have exactly one child that's not `None`,
+        /// i.e. comprised only of consecutive `One` except the tail being `Two` or `Leaf`,
         /// in which case the `descendant_idx` shall only point to indices within the list.
         ///
         /// I.e. if there's some path comprised of consecutive `One`, then a `Two`,
         /// followed by more `One`,
-        /// those `One` in the previous part shall not point any `One` in the latter part.
+        /// those `One` in the previous part shall not point to any `One` in the latter part.
         descendant_idx: NonZeroUsize,
     },
+    /// This node has two children.
     Two {
         sum: usize,
     },
@@ -39,8 +41,8 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
     fn right(u: usize) -> NonZeroUsize {
         NonZeroUsize::new(u * 2 + 2).unwrap()
     }
-    fn parent(u: NonZeroUsize) -> usize {
-        (u.get() - 1) / 2
+    fn parent(u: usize) -> Option<usize> {
+        u.checked_sub(1).map(|i| i / 2)
     }
     fn sibling(u: NonZeroUsize) -> NonZeroUsize {
         let u = u.get();
@@ -167,7 +169,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
                     // if no prizes, just bail out with error
                     let prize = prizes.peek().ok_or(())?;
                     let ticket_count = u.ticket_count();
-                    if ticket_count > 0 && u.add_prize(*prize) {
+                    if ticket_count > 0 && u.add_prize(prize) {
                         // only advance the iterator if we're sure `impl User` takes it just fine
                         prizes.next();
                         self.decrease_tickets_count(idx, 1);
@@ -180,7 +182,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
                         self.decrease_tickets_count(idx, ticket_count);
                         self.binary_tree[idx] = BinaryTreeNode::None;
                         if let Some(idx_of_purged_leaf) = NonZeroUsize::new(idx) {
-                            self.cleanup_after_purge_node(idx_of_purged_leaf);
+                            self.cleanup_after_purge_node(idx_of_purged_leaf.get());
                         } else {
                             // the index is just zero, meaning the leaf is also root,
                             // no more users available, just return error
@@ -217,7 +219,7 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
     ///
     /// Note the node at input index is excluded.
     fn decrease_tickets_count(&mut self, mut idx: usize, ticket_count: usize) {
-        while let Some(parent) = NonZeroUsize::new(idx).map(Self::parent) {
+        while let Some(parent) = Self::parent(idx) {
             idx = parent;
             if let BinaryTreeNode::Two { sum } = &mut self.binary_tree[parent] {
                 *sum -= ticket_count;
@@ -231,28 +233,27 @@ impl<'u, U: for<'hrtb> User<'hrtb>> SpaceEfficientShuffler<'u, U> {
     /// N.B.
     /// The input index should point to `BinaryTreeNode::None`.
     /// The ticket counters are assumed to be valid and thus _not_ modified.
-    fn cleanup_after_purge_node(&mut self, mut i: NonZeroUsize) {
+    fn cleanup_after_purge_node(&mut self, mut i: usize) {
         use crate::space_efficient_shuffler::SpaceEfficientShuffler as RP;
-        while let BinaryTreeNode::None = &self.binary_tree[i.get()] {
-            match &mut self.binary_tree[Self::parent(i)] {
+        while let (Some(parent_idx), BinaryTreeNode::None) = (Self::parent(i), &self.binary_tree[i]) {
+            match &mut self.binary_tree[parent_idx] {
                 BinaryTreeNode::None | BinaryTreeNode::Leaf(_) => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 one @ BinaryTreeNode::One { .. } => {
-                    // The parent `BinaryTreeNode::One` used to point to a `BinaryTreeNode::Leaf`,
-                    // now it's `BinaryTreeNode::None`.
+                    // The parent `BinaryTreeNode::One` used to point to either
+                    // `BinaryTreeNode::One` or `BinaryTreeNode::Leaf`,
+                    // but now the child is `BinaryTreeNode::None`.
                     // Thus this parent should become `BinaryTreeNode::None`, too.
                     *one = BinaryTreeNode::None;
-                    if let Some(p) = NonZeroUsize::new(Self::parent(i)) {
-                        i = p;
-                    } else {
-                        break;
-                    }
+                    i = parent_idx;
                 },
                 two @ &mut BinaryTreeNode::Two { .. } => {
-                    // Lazy: we don't care if the sibling is `BinaryTreeNode::One`,
-                    // for the `SpaceEfficientShuffler` would trim them as they see fit:
+                    // Lazy: we don't care what's the sibling,
+                    // for the `SpaceEfficientShuffler::draw_one` would trim them as they see fit:
                     // if that sibling has few tickets, it might not be accessed ever again anyway
                     *two = BinaryTreeNode::One {
-                        descendant_idx: RP::<U>::sibling(i),
+                        // `Option::unwrap` safety:
+                        // this node has two children, meaning we must have sibling
+                        descendant_idx: RP::<U>::sibling(NonZeroUsize::new(i).unwrap()),
                     };
                     break;
                 },
