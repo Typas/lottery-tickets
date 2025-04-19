@@ -1,6 +1,10 @@
 pub mod prize;
 pub mod tickets;
 pub mod user;
+mod space_efficient_shuffler;
+
+#[cfg(test)]
+mod test_utils;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

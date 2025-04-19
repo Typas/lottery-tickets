@@ -1,33 +1,42 @@
 use std::{
     collections::HashMap,
     hash::{Hash, RandomState},
+    iter::repeat_n,
+    marker::PhantomData,
 };
 
 use rand::Rng;
 
-use crate::{prize::Prize, user::User};
-pub struct Tickets<K, U, S = RandomState>
+use crate::{prize::Prize, space_efficient_shuffler, user::User};
+pub struct Tickets<'user, K, U, S = RandomState>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, Key = K>,
+    U: User<'user, Key = K>,
 {
     shuffled: bool,
     // The users in a hash map, use .users() to get the result
     users: HashMap<K, U, S>,
     // The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
+    /// The lifetime is actually refering to those `impl User` in the map,
+    /// which in turn is referring to `Prize` in this exact struct (`Self::prizes`)
+    ///
+    /// Rust complains if not explicitly used in any of the fields,
+    /// thus the marker.
+    _marker: PhantomData<&'user U>,
 }
 
-impl<K, U> Tickets<K, U>
+impl<'u, K, U> Tickets<'u, K, U>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, Key = K>,
+    U: User<'u, Key = K>,
 {
     pub fn new() -> Self {
         Self {
             users: HashMap::new(),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 
@@ -36,14 +45,15 @@ where
             users: HashMap::with_capacity(cap),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 }
 
-impl<K, U, S> Tickets<K, U, S>
+impl<'u, K, U, S> Tickets<'u, K, U, S>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, Key = K>,
+    U: User<'u, Key = K>,
     S: std::hash::BuildHasher + std::default::Default,
 {
     pub fn with_user_capacity_and_hasher(cap: usize, hasher: S) -> Self {
@@ -51,6 +61,7 @@ where
             users: HashMap::with_capacity_and_hasher(cap, hasher),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 
@@ -59,6 +70,7 @@ where
             users: HashMap::with_hasher(hasher),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 
@@ -69,7 +81,7 @@ where
 
     /// Add a user to the lottery.
     /// When the keys collide, it would return the old user.
-    pub fn add_user<'a>(&mut self, user: U) -> Option<U> {
+    pub fn add_user(&mut self, user: U) -> Option<U> {
         self.users.insert(user.key(), user)
     }
 
@@ -109,10 +121,34 @@ where
         self.users.values_mut()
     }
 
+    pub fn shuffle_many_tickets<'myself>(&'myself mut self, rng: &mut impl Rng)
+    where
+        'myself: 'u,
+    {
+        if self.shuffled {
+            return;
+        }
+        self.shuffled = true;
+        let mut prizes = self
+            .prizes
+            .iter()
+            .flat_map(|p| repeat_n((), p.count()).map(move |_| p))
+            .peekable();
+        let mut space_efficient_shuffler =
+            space_efficient_shuffler::SpaceEfficientShuffler::new(self.users.values_mut());
+        while space_efficient_shuffler
+            .try_draw_one(rng, &mut prizes)
+            .ok()
+            .flatten()
+            .is_some()
+        {}
+    }
+
     /// Shuffle the slots and distribute the prizes to the users.
-    pub fn shuffle<R>(&mut self, rng: &mut R)
+    pub fn shuffle<'myself, R>(&'myself mut self, rng: &mut R)
     where
         R: Rng,
+        'myself: 'u,
     {
         use std::iter::repeat_n;
         // Shuffle twice would cause double spend.
@@ -169,5 +205,50 @@ where
             }
         }
         self.shuffled = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use super::Tickets;
+    use crate::prize::PrizeBuilder;
+    use crate::test_utils::UserWithLog;
+    #[test]
+    fn test_space_efficient_shuffler() {
+        let mut rng = rand::rng();
+        const MAX_PRIZE_COUNT: usize = 100;
+        const NUM_USERS: usize = 65536;
+        let (prizes, num_prizes) = {
+            let mut n = 0;
+            let ret = Vec::from_iter((0..MAX_PRIZE_COUNT).into_iter().map(|x| {
+                n += x;
+                PrizeBuilder::new().count(x).name(format!("{x}")).build()
+            }));
+            (ret, n)
+        };
+        let (users, log) = (0..NUM_USERS)
+            .into_iter()
+            .map(UserWithLog::new)
+            .collect::<(Vec<_>, Vec<_>)>();
+        let mut tickets = Tickets::new();
+        prizes.into_iter().for_each(|p| tickets.add_prize(p));
+        users.into_iter().for_each(|u| {
+            tickets.add_user(u);
+        });
+        tickets.shuffle_many_tickets(&mut rng);
+        assert_eq!(log.iter().map(|u| u.borrow().len()).sum::<usize>(), num_prizes);
+        (0..MAX_PRIZE_COUNT).into_iter().for_each(|i| {
+            let name = &format!("{i}");
+            assert_eq!(
+                log.iter()
+                    .map(|rc| &**rc)
+                    .map(RefCell::borrow)
+                    .map(|v| v.as_slice().iter().filter(|p| p.name() == name).count())
+                    .sum::<usize>(),
+                i
+            )
+        });
     }
 }
