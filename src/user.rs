@@ -10,6 +10,10 @@ pub trait User<'a> {
     /// total count of lottery ticket
     fn ticket_count(&self) -> usize;
     /// add the prize, return false if failed
+    ///
+    /// Assumed to be monotone, in the sense that once returned `false`,
+    /// it's never `true` again,
+    /// effectively the implementation cannot be picky about the prizes
     fn add_prize(&mut self, prize: &'a Prize) -> bool;
     /// check if the user has at least one prize
     fn has_prize(&self) -> bool;
