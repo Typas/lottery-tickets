@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Prize {
     name: String,
     count: usize,

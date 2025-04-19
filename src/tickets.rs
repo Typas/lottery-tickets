@@ -1,33 +1,37 @@
 use std::{
     collections::HashMap,
     hash::{Hash, RandomState},
+    iter::repeat_n,
+    marker::PhantomData,
 };
 
 use rand::Rng;
 
 use crate::{prize::Prize, space_efficient_shuffler, user::User};
-pub struct Tickets<K, U, S = RandomState>
+pub struct Tickets<'u, K, U, S = RandomState>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, Key = K>,
+    U: User<'u, Key = K>,
 {
     shuffled: bool,
     // The users in a hash map, use .users() to get the result
     users: HashMap<K, U, S>,
     // The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
+    _marker: PhantomData<&'u ()>,
 }
 
-impl<K, U> Tickets<K, U>
+impl<'u, K, U> Tickets<'u, K, U>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, Key = K>,
+    U: User<'u, Key = K>,
 {
     pub fn new() -> Self {
         Self {
             users: HashMap::new(),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 
@@ -36,14 +40,15 @@ where
             users: HashMap::with_capacity(cap),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 }
 
-impl<K, U, S> Tickets<K, U, S>
+impl<'u, K, U, S> Tickets<'u, K, U, S>
 where
     K: Hash + Eq,
-    for<'a> U: User<'a, Key = K>,
+    U: User<'u, Key = K>,
     S: std::hash::BuildHasher + std::default::Default,
 {
     pub fn with_user_capacity_and_hasher(cap: usize, hasher: S) -> Self {
@@ -51,6 +56,7 @@ where
             users: HashMap::with_capacity_and_hasher(cap, hasher),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 
@@ -59,6 +65,7 @@ where
             users: HashMap::with_hasher(hasher),
             prizes: Vec::new(),
             shuffled: false,
+            _marker: PhantomData,
         }
     }
 
@@ -69,7 +76,7 @@ where
 
     /// Add a user to the lottery.
     /// When the keys collide, it would return the old user.
-    pub fn add_user<'a>(&mut self, user: U) -> Option<U> {
+    pub fn add_user(&mut self, user: U) -> Option<U> {
         self.users.insert(user.key(), user)
     }
 
@@ -109,14 +116,21 @@ where
         self.users.values_mut()
     }
 
-    pub fn shuffle_many_tickets(&mut self, rng: &mut impl Rng) {
+    pub fn shuffle_many_tickets<'me>(&'me mut self, rng: &mut impl Rng)
+    where
+        'me: 'u,
+    {
         if self.shuffled {
             return;
         }
         self.shuffled = true;
+        let mut prizes = self
+            .prizes
+            .iter()
+            .flat_map(|p| repeat_n((), p.count()).map(move |_| p))
+            .peekable();
         let mut space_efficient_shuffler =
             space_efficient_shuffler::SpaceEfficientShuffler::new(self.users.values_mut());
-        let mut prizes = self.prizes.iter().peekable();
         while space_efficient_shuffler
             .try_draw_one(rng, &mut prizes)
             .ok()
@@ -128,9 +142,10 @@ where
     }
 
     /// Shuffle the slots and distribute the prizes to the users.
-    pub fn shuffle<R>(&mut self, rng: &mut R)
+    pub fn shuffle<'me, R>(&'me mut self, rng: &mut R)
     where
         R: Rng,
+        'me: 'u,
     {
         use std::iter::repeat_n;
         // Shuffle twice would cause double spend.
@@ -187,5 +202,28 @@ where
             }
         }
         self.shuffled = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Tickets;
+    use crate::prize::PrizeBuilder;
+    use crate::test_utils::SimpleUser;
+    #[test]
+    fn test_space_efficient_shuffler() {
+        let mut rng = rand::rng();
+        let prizes = Vec::from_iter(
+            (0..100)
+                .into_iter()
+                .map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()),
+        );
+        let users = Vec::from_iter((0..65536).into_iter().map(SimpleUser::new));
+        let mut tickets = Tickets::new();
+        prizes.into_iter().for_each(|p| tickets.add_prize(p));
+        users.into_iter().for_each(|u| {
+            tickets.add_user(u);
+        });
+        tickets.shuffle_many_tickets(&mut rng);
     }
 }
