@@ -26,6 +26,16 @@ where
     _marker: PhantomData<&'user U>,
 }
 
+impl<'u, K, U> Default for Tickets<'u, K, U>
+where
+    K: Hash + Eq,
+    U: User<'u, Key = K>,
+ {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'u, K, U> Tickets<'u, K, U>
 where
     K: Hash + Eq,
@@ -187,10 +197,10 @@ where
         // p2 -> u2
         // p2 -> u6 // skip u5, same assumption
         // p2 -> u7
-        let mut prizes = self.prizes.iter().flat_map(|p| repeat_n(p, p.count()));
+        let prizes = self.prizes.iter().flat_map(|p| repeat_n(p, p.count()));
         let mut tickets = tickets_god_only_knows_which_user.into_iter();
-        while let Some(prize) = prizes.next() {
-            while let Some(ticket) = tickets.next() {
+        for prize in prizes {
+            for ticket in tickets.by_ref() {
                 // It is possible to use raw pointer to reduce both key production and hashing costs.
                 // However, it requires unsafe.
                 // Fortunately, this is not recursive, and relative simple to check the boundary.
@@ -221,14 +231,15 @@ mod tests {
         const NUM_USERS: usize = 65536;
         let prizes =
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
-        let (mut users, logs) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+        let (mut users, log) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
         let mut ses = SpaceEfficientShuffler::new(&mut users);
         let mut prizes = prizes.iter().peekable();
         while ses.try_draw_one(&mut rng, &mut prizes) {}
         assert_eq!(
-            BTreeSet::from_iter(logs.into_iter().flat_map(|u| {
-                assert!(u.borrow().len() == 0 || u.borrow().len() == 1);
-                Vec::from_iter(u.borrow().iter().map(|p| p.name()).map(String::from))
+            BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
+                let prizes_of_user = prizes_of_user.borrow();
+                assert!(prizes_of_user.is_empty() || prizes_of_user.len() == 1);
+                Vec::from_iter(prizes_of_user.iter().map(|p| p.name()).map(String::from))
             })),
             BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
         );
@@ -241,16 +252,13 @@ mod tests {
         const NUM_USERS: usize = 65536;
         let (prizes, num_prizes) = {
             let mut n = 0;
-            let ret = Vec::from_iter((0..MAX_PRIZE_COUNT).into_iter().map(|x| {
+            let ret = Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| {
                 n += x;
                 PrizeBuilder::new().count(x).name(format!("{x}")).build()
             }));
             (ret, n)
         };
-        let (users, log) = (0..NUM_USERS)
-            .into_iter()
-            .map(GenericUser::new)
-            .collect::<(Vec<_>, Vec<_>)>();
+        let (users, log) = (0..NUM_USERS).map(GenericUser::new).collect::<(Vec<_>, Vec<_>)>();
         let mut tickets = Tickets::new();
         prizes.into_iter().for_each(|p| tickets.add_prize(p));
         users.into_iter().for_each(|u| {
@@ -258,7 +266,7 @@ mod tests {
         });
         tickets.shuffle_many_tickets(&mut rng);
         assert_eq!(log.iter().map(|u| u.borrow().len()).sum::<usize>(), num_prizes);
-        (0..MAX_PRIZE_COUNT).into_iter().for_each(|i| {
+        (0..MAX_PRIZE_COUNT).for_each(|i| {
             let name = &format!("{i}");
             assert_eq!(
                 log.iter()

@@ -39,7 +39,7 @@ pub struct UserBuilder {
     id: Option<Uuid>,
 }
 
-impl<'a> SinglePrizeUser<'a> {
+impl SinglePrizeUser<'_> {
     pub fn new(id: Uuid, name: String, ticket_count: usize) -> Self {
         Self {
             count: ticket_count,
@@ -83,7 +83,7 @@ impl<'a> User<'a> for SinglePrizeUser<'a> {
     }
 }
 
-impl<'a> MultiPrizeUser<'a> {
+impl MultiPrizeUser<'_> {
     pub fn new(id: Uuid, name: String, ticket_count: usize) -> Self {
         Self {
             count: ticket_count,
@@ -119,6 +119,12 @@ impl<'a> User<'a> for MultiPrizeUser<'a> {
 
     fn has_prize(&self) -> bool {
         !self.prizes.is_empty()
+    }
+}
+
+impl Default for UserBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

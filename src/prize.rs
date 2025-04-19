@@ -23,6 +23,12 @@ impl Prize {
     }
 }
 
+impl Default for PrizeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PrizeBuilder {
     pub fn new() -> Self {
         Self { name: None, count: 1 }
