@@ -165,14 +165,13 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
         rng: &mut impl Rng,
         prizes: &mut Peekable<impl Iterator<Item = &'u Prize>>,
     ) -> bool {
+        // if no prizes, just bail out with error
+        let Some(prize) = prizes.peek() else { return false };
+
         let mut idx = 0;
         loop {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
-
-            // if no prizes, just bail out with error
-            let Some(prize) = prizes.peek() else { return false };
-
             match &self.binary_tree[idx] {
                 BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 BinaryTreeNode::One { descendant_idx } => {
