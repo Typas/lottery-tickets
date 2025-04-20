@@ -140,10 +140,12 @@ where
         // Let `u` be the number of users, `t` be the number of tickets, `p` be the number of prizes.
         // Assuming the size of "tree" would require 24 * 2 * u * log(u),
         // while the size of "array" would require 16 * t.
-        // We might compare `3*u*log(u)` with `t`.
+        // We might compare `3 * u * log(u)` with `t`.
+        // XXX: Engineering factor for adjusting the boundary.
         let array_est: usize = self.users.values().map(|u| u.ticket_count()).sum();
         let tree_est = 3 * self.users.len() * self.users.len().ilog2() as usize;
-        if array_est <= tree_est {
+        let tree_factor = 1;
+        if array_est <= tree_est * tree_factor {
             self.shuffle_tree(rng);
         } else {
             self.shuffle_array(rng);
@@ -339,5 +341,29 @@ mod tests {
                 i
             )
         });
+    }
+
+    #[test]
+    fn test_space_efficient_shuffler_skewed_tickets() {
+        let mut rng = rand::rngs::mock::StepRng::new(1, 0);
+        const MAX_PRIZE_COUNT: usize = 10;
+        const NUM_USERS: usize = 11;
+        let prizes =
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+        // set the first user would always not have the prize
+        let (mut users, log) = (0..NUM_USERS)
+            .map(|u| CapacityOneUser::new(if u == 0 { 1 } else { 1000 }))
+            .collect::<(Vec<_>, Vec<_>)>();
+        let mut ses = SpaceEfficientShuffler::new(&mut users);
+        let mut prizes = prizes.iter().peekable();
+        while ses.try_draw_one(&mut rng, &mut prizes) {}
+        assert_eq!(
+            BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
+                let prizes_of_user = prizes_of_user.borrow();
+                assert!(prizes_of_user.len() <= 1);
+                prizes_of_user.iter().next().map(|p| p.name()).map(String::from)
+            })),
+            BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
+        );
     }
 }
