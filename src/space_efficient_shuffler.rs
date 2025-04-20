@@ -154,12 +154,15 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
     /// in which case we should retry from root.
     ///
     /// Return:
-    /// `Err` if no more lottery either because no users or no prizes,
-    /// `Ok(Some(..))` if successfully picked the lucky user,
-    /// `Ok(None)` if spurious fail and we shall try again.
+    /// `false` if no more lottery can be drawn, either because of no remaining users or no remaining prizes;
+    /// `true` if successfully picked the lucky user.
     ///
     /// TODO
     /// implement entropy pool, maybe as simple as caching random numbers.
+    /// comment: if you want to implement an entropy pool,
+    /// it would be better to placed in `Tickets`,
+    /// and fetch some random numbers during adding things.
+    /// However, how could you use it when the rng is outsourced?
     pub(crate) fn try_draw_one(
         &mut self,
         rng: &mut impl Rng,

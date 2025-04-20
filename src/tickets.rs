@@ -13,10 +13,11 @@ where
     K: Hash + Eq,
     U: User<'user, Key = K>,
 {
+    /// Determine whether the lottery has been shuffled and done.
     shuffled: bool,
-    // The users in a hash map, use .users() to get the result
+    /// The users in a hash map, use .users() to get the result
     users: HashMap<K, U, S>,
-    // The prizes, the lower the index, the higher the priority.
+    /// The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
     /// The lifetime is actually refering to those `impl User` in the map,
     /// which in turn is referring to `Prize` in this exact struct (`Self::prizes`)
@@ -131,7 +132,25 @@ where
         self.users.values_mut()
     }
 
-    pub fn shuffle_many_tickets<'myself>(&'myself mut self, rng: &mut impl Rng)
+    pub fn shuffle<'myself>(&'myself mut self, rng: &mut impl Rng)
+    where
+        'myself: 'u,
+    {
+        // FIXME: this is just a guess.
+        // Let `u` be the number of users, `t` be the number of tickets, `p` be the number of prizes.
+        // Assuming the size of "tree" would require 24 * 2 * u * log(u),
+        // while the size of "array" would require 16 * t.
+        // We might compare `3*u*log(u)` with `t`.
+        let array_est: usize = self.users.values().map(|u| u.ticket_count()).sum();
+        let tree_est = 3 * self.users.len() * self.users.len().ilog2() as usize;
+        if array_est <= tree_est {
+            self.shuffle_tree(rng);
+        } else {
+            self.shuffle_array(rng);
+        }
+    }
+
+    pub fn shuffle_tree<'myself>(&'myself mut self, rng: &mut impl Rng)
     where
         'myself: 'u,
     {
@@ -150,7 +169,7 @@ where
     }
 
     /// Shuffle the slots and distribute the prizes to the users.
-    pub fn shuffle<'myself, R>(&'myself mut self, rng: &mut R)
+    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R)
     where
         R: Rng,
         'myself: 'u,
@@ -307,7 +326,7 @@ mod tests {
         users.into_iter().for_each(|u| {
             tickets.add_user(u);
         });
-        tickets.shuffle_many_tickets(&mut rng);
+        tickets.shuffle_tree(&mut rng);
         assert_eq!(log.iter().map(|u| u.borrow().len()).sum::<usize>(), num_prizes);
         (0..MAX_PRIZE_COUNT).for_each(|i| {
             let name = &format!("{i}");
