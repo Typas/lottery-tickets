@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::{iter::Peekable, num::NonZeroUsize};
 
 use crate::{prize::Prize, user::User};
@@ -86,56 +85,48 @@ where
             };
         }
 
-        /// Given internal nodes be `BinaryTreeNode::None` and leaf nodes `BinaryTreeNode::Leaf`,
-        /// make every internal node `BinaryTreeNode::Two`:
-        /// internal nodes in a complete binary tree all have two children
-        ///
-        /// Input should be valid indices only.
-        fn init_at<'u, U: User<'u> + 'u>(i: usize, v: &mut [BinaryTreeNode<U>]) {
-            use crate::space_efficient_shuffler::SpaceEfficientShuffler as SES;
-            if let BinaryTreeNode::None = &v[i] {
-                // During initialization, `None` iff internal node,
-                // and being a complete tree, internal nodes have both childrens,
-                // thus here we may safely assume both left and right are still within boundary
-                init_at(SES::<U>::left(i).get(), v);
-                init_at(SES::<U>::right(i).get(), v);
-                match (&v[SES::<U>::left(i).get()], &v[SES::<U>::right(i).get()]) {
-                    (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
-                        v[i] = BinaryTreeNode::Two {
-                            total_tickets_of_subtree: l.ticket_count() + r.ticket_count(),
-                        }
+        // complete binary tree: (# leaves) = L <=> (# nodes) = 2*L-1
+        // e.g. (# leaves) = 1 => (# nodes) = 1
+        //      (# leaves) = 2 => (# nodes) = 3
+        //      (# leaves) = 3 => (# nodes) = 5
+        //      ...
+        // thus last internal node has index one less than length divided by two.
+        (0..binary_tree.len() / 2).rev().for_each(|idx_internal_node| {
+            match (
+                &binary_tree[Self::left(idx_internal_node).get()],
+                &binary_tree[Self::right(idx_internal_node).get()],
+            ) {
+                (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
+                    binary_tree[idx_internal_node] = BinaryTreeNode::Two {
+                        total_tickets_of_subtree: l.ticket_count() + r.ticket_count(),
+                    }
+                },
+                (
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree: sum,
                     },
-                    (
-                        BinaryTreeNode::Two {
-                            total_tickets_of_subtree: sum,
-                        },
-                        BinaryTreeNode::Leaf(u),
-                    ) => {
-                        v[i] = BinaryTreeNode::Two {
-                            total_tickets_of_subtree: sum + u.ticket_count(),
-                        }
+                    BinaryTreeNode::Leaf(u),
+                ) => {
+                    binary_tree[idx_internal_node] = BinaryTreeNode::Two {
+                        total_tickets_of_subtree: sum + u.ticket_count(),
+                    }
+                },
+                (
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree: l,
                     },
-                    (
-                        BinaryTreeNode::Two {
-                            total_tickets_of_subtree: l,
-                        },
-                        BinaryTreeNode::Two {
-                            total_tickets_of_subtree: r,
-                        },
-                    ) => {
-                        v[i] = BinaryTreeNode::Two {
-                            total_tickets_of_subtree: l + r,
-                        }
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree: r,
                     },
-                    _ => {
-                        panic!("Not a complete binary tree!");
-                    },
-                }
+                ) => {
+                    binary_tree[idx_internal_node] = BinaryTreeNode::Two {
+                        total_tickets_of_subtree: l + r,
+                    }
+                },
+                _ => panic!("{}", Self::ERR_DATA_INCONSISTENT),
             }
-        }
+        });
 
-        // we've early return if there were no users in the first place
-        init_at(0, &mut binary_tree);
         Self { binary_tree }
     }
 
