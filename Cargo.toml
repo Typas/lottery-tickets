@@ -11,3 +11,10 @@ version = "1.16"
 features = [
     "v4",
 ]
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "random_number_baseline"
+harness = false
