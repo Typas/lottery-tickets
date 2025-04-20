@@ -1,8 +1,12 @@
+use std::marker::PhantomData;
 use std::{iter::Peekable, num::NonZeroUsize};
 
 use crate::{prize::Prize, user::User};
 use rand::Rng;
-pub(crate) struct SpaceEfficientShuffler<'u, U> {
+pub(crate) struct SpaceEfficientShuffler<'prize, 'user, U>
+where
+    'prize: 'user,
+{
     /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete user.
     ///
     /// All nodes are token for some subset of users.
@@ -10,7 +14,8 @@ pub(crate) struct SpaceEfficientShuffler<'u, U> {
     /// they are disjoint subsets of the node and union of children is the node itself.
     ///
     /// See also `BinaryTreeNode`.
-    binary_tree: Vec<BinaryTreeNode<'u, U>>,
+    binary_tree: Vec<BinaryTreeNode<'user, U>>,
+    _prize: PhantomData<&'prize Prize>,
 }
 
 #[derive(Debug)]
@@ -40,7 +45,10 @@ enum BinaryTreeNode<'u, U> {
     Leaf(&'u mut U),
 }
 
-impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
+impl<'prize, 'user, U: User<'prize> + 'prize> SpaceEfficientShuffler<'prize, 'user, U>
+where
+    'prize: 'user,
+{
     const ERR_DATA_INCONSISTENT: &'static str = "Data strucutre inconsistent";
 
     /// Use with caution: do not call on leaves!
@@ -64,13 +72,16 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
     /// Make `SpaceEfficientShuffler::binary_tree` a _complete binary tree_,
     /// in which all internal nodes are `BinaryTreeNode::Two`,
     /// and all leaf nodes are `BinaryTreeNode::Leaf`
-    pub(crate) fn new(iter: impl IntoIterator<Item = &'u mut U>) -> Self {
+    pub(crate) fn new(iter: impl IntoIterator<Item = &'user mut U>) -> Self {
         let iter = iter.into_iter();
         let mut binary_tree = Vec::with_capacity(iter.size_hint().0 * 2);
         binary_tree.extend(iter.map(BinaryTreeNode::Leaf));
         if binary_tree.is_empty() {
             // early return s.t. later we may assume non-zero user count
-            return Self { binary_tree };
+            return Self {
+                binary_tree,
+                _prize: PhantomData,
+            };
         } else {
             // to make a complete binary tree in which leaf node iff `BinaryTreeNode::Leaf`,
             // # of internal nodes is exactly one less than (# of leafs i.e. # of users)
@@ -132,7 +143,10 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
 
         // we've early return if there were no users in the first place
         init_at(0, &mut binary_tree);
-        Self { binary_tree }
+        Self {
+            binary_tree,
+            _prize: PhantomData,
+        }
     }
 
     /// Each node is either one user or a set of users, as determined by `BinaryTreeNode`.
@@ -166,7 +180,7 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
     pub(crate) fn try_draw_one(
         &mut self,
         rng: &mut impl Rng,
-        prizes: &mut Peekable<impl Iterator<Item = &'u Prize>>,
+        prizes: &mut Peekable<impl Iterator<Item = &'prize Prize>>,
     ) -> bool {
         // if no prizes, just bail out with error
         let Some(prize) = prizes.peek() else { return false };
@@ -411,6 +425,13 @@ mod tests {
         }
         assert_eq!(users.len(), NUM_USERS);
         assert_eq!(users.iter().filter(|u| u.prize.is_none()).count(), 1);
-        assert_eq!(users.iter().filter(|u| u.key() == 0).map(|u| u.prize.is_none()).count(), 1);
+        assert_eq!(
+            users
+                .iter()
+                .filter(|u| u.key() == 0)
+                .filter(|u| u.prize.is_none())
+                .count(),
+            1
+        );
     }
 }
