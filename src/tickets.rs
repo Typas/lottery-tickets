@@ -30,7 +30,7 @@ impl<'u, K, U> Default for Tickets<'u, K, U>
 where
     K: Hash + Eq,
     U: User<'u, Key = K>,
- {
+{
     fn default() -> Self {
         Self::new()
     }
@@ -225,6 +225,49 @@ mod tests {
     use crate::test_utils::GenericUser;
 
     #[test]
+    fn test_space_efficient_shuffler_few_users() {
+        let mut rng = rand::rng();
+        const MAX_PRIZE_COUNT: usize = 100;
+        const NUM_USERS: usize = 1;
+        let prizes =
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+        {
+            // A single user which doesn't hold any tickets
+            let (mut users, log) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            let mut prizes = prizes.iter().peekable();
+            let num_iterations = (1..)
+                .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
+                .last()
+                .unwrap_or(0);
+            assert!(log.into_iter().all(|prizes_of_user| prizes_of_user.borrow().is_empty()));
+            // draw, discovering that the user invalid, abort.
+            // this shows when few users/tickets, we finish quickly
+            assert_eq!(num_iterations, 0);
+        }
+        {
+            // A single user which holds exactly one ticket
+            let (mut users, log) = (1..=NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            let mut prizes = prizes.iter().peekable();
+            let num_iterations = (1..)
+                .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
+                .last()
+                .unwrap_or(0);
+            assert_eq!(
+                log.into_iter()
+                    .map(|prizes_of_user| prizes_of_user.borrow().len())
+                    .sum::<usize>(),
+                1
+            );
+            // draw, ok.
+            // draw, discovering that the user invalid, abort.
+            // this shows when few users/tickets, we finish quickly
+            assert_eq!(num_iterations, 1)
+        }
+    }
+
+    #[test]
     fn test_space_efficient_shuffler_capacity_one_user() {
         let mut rng = rand::rng();
         const MAX_PRIZE_COUNT: usize = 100;
@@ -238,8 +281,8 @@ mod tests {
         assert_eq!(
             BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
                 let prizes_of_user = prizes_of_user.borrow();
-                assert!(prizes_of_user.is_empty() || prizes_of_user.len() == 1);
-                Vec::from_iter(prizes_of_user.iter().map(|p| p.name()).map(String::from))
+                assert!(prizes_of_user.len() <= 1);
+                prizes_of_user.iter().next().map(|p| p.name()).map(String::from)
             })),
             BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
         );
