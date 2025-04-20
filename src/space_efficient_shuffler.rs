@@ -309,3 +309,108 @@ impl<'u, U: User<'u>> SpaceEfficientShuffler<'u, U> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::SpaceEfficientShuffler;
+    use crate::prize::PrizeBuilder;
+    use crate::test_utils::CapacityOneUser;
+    use crate::user::User;
+
+    #[test]
+    fn test_space_efficient_shuffler_few_users() {
+        let mut rng = rand::rng();
+        const MAX_PRIZE_COUNT: usize = 100;
+        const NUM_USERS: usize = 1;
+        let prizes =
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+        {
+            // A single user which doesn't hold any tickets
+            let (mut users, log) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            let mut prizes = prizes.iter().peekable();
+            let num_iterations = (1..)
+                .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
+                .last()
+                .unwrap_or(0);
+            assert!(log.into_iter().all(|prizes_of_user| prizes_of_user.borrow().is_empty()));
+            // draw, discovering that the user invalid, abort.
+            // this shows when few users/tickets, we finish quickly
+            assert_eq!(num_iterations, 0);
+        }
+        {
+            // A single user which holds exactly one ticket
+            let (mut users, log) = (1..=NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            let mut prizes = prizes.iter().peekable();
+            let num_iterations = (1..)
+                .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
+                .last()
+                .unwrap_or(0);
+            assert_eq!(
+                log.into_iter()
+                    .map(|prizes_of_user| prizes_of_user.borrow().len())
+                    .sum::<usize>(),
+                1
+            );
+            // draw, ok.
+            // draw, discovering that the user invalid, abort.
+            // this shows when few users/tickets, we finish quickly
+            assert_eq!(num_iterations, 1)
+        }
+    }
+
+    #[test]
+    fn test_space_efficient_shuffler_capacity_one_user() {
+        let mut rng = rand::rng();
+        const MAX_PRIZE_COUNT: usize = 100;
+        const NUM_USERS: usize = 65536;
+        let prizes =
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+        let (mut users, log) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
+        let mut ses = SpaceEfficientShuffler::new(&mut users);
+        let mut prizes = prizes.iter().peekable();
+        while ses.try_draw_one(&mut rng, &mut prizes) {}
+        assert_eq!(
+            BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
+                let prizes_of_user = prizes_of_user.borrow();
+                assert!(prizes_of_user.len() <= 1);
+                prizes_of_user.iter().next().map(|p| p.name()).map(String::from)
+            })),
+            BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
+        );
+    }
+
+    #[test]
+    fn test_space_efficient_shuffler_skewed_tickets() {
+        let mut rng = rand::rngs::mock::StepRng::new(1, 0);
+        const MAX_PRIZE_COUNT: usize = 1000;
+        const NUM_USERS: usize = 1001;
+        let prizes =
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+        // set the first user would always not have the prize
+        let (mut users, log) = (0..NUM_USERS)
+            .map(|u| CapacityOneUser::with_tickets_count(u, if u == 0 { 1 } else { 1000 }))
+            .collect::<(Vec<_>, Vec<_>)>();
+        assert_eq!(users.len(), NUM_USERS);
+        {
+            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            assert_eq!(ses.binary_tree.len(), NUM_USERS * 2 - 1);
+            let mut prizes = prizes.iter().peekable();
+            while ses.try_draw_one(&mut rng, &mut prizes) {}
+            assert_eq!(
+                BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
+                    let prizes_of_user = prizes_of_user.borrow();
+                    assert!(prizes_of_user.len() <= 1);
+                    prizes_of_user.iter().next().map(|p| p.name()).map(String::from)
+                })),
+                BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
+            );
+        }
+        assert_eq!(users.len(), NUM_USERS);
+        assert_eq!(users.iter().filter(|u| u.prize.is_none()).count(), 1);
+        assert_eq!(users.iter().filter(|u| u.key() == 0).map(|u| u.prize.is_none()).count(), 1);
+    }
+}

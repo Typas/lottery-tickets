@@ -47,6 +47,19 @@ impl<'p> GenericUser<'p> {
             external_log,
         )
     }
+
+    pub(crate) fn with_tickets_count(uuid: usize, tickets_count: usize) -> (Self, Rc<RefCell<Vec<&'p Prize>>>) {
+        let external_log = Rc::new(RefCell::new(vec![]));
+        (
+            Self {
+                uuid,
+                tickets_count,
+                prizes: vec![],
+                log: Rc::clone(&external_log),
+            },
+            external_log,
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -87,6 +100,19 @@ impl<'p> CapacityOneUser<'p> {
             Self {
                 uuid,
                 tickets_count: uuid,
+                prize: None,
+                log: Rc::clone(&external_log),
+            },
+            external_log,
+        )
+    }
+
+    pub(crate) fn with_tickets_count(uuid: usize, tickets_count: usize) -> (Self, Rc<RefCell<Vec<&'p Prize>>>) {
+        let external_log = Rc::new(RefCell::new(vec![]));
+        (
+            Self {
+                uuid,
+                tickets_count,
                 prize: None,
                 log: Rc::clone(&external_log),
             },
