@@ -1,4 +1,7 @@
-use std::{iter::Peekable, num::NonZeroUsize};
+use std::{
+    iter::{Peekable, repeat},
+    num::NonZeroUsize,
+};
 
 use crate::{prize::Prize, user::User};
 use rand::Rng;
@@ -259,16 +262,19 @@ where
     /// keeping the counters (`BinaryTreeNode::Two`) sane.
     ///
     /// Note the node at input index is excluded.
-    fn decrease_tickets_count(&mut self, mut idx: usize, ticket_count: usize) {
-        while let Some(parent) = Self::parent(idx) {
-            idx = parent;
-            if let BinaryTreeNode::Two {
-                total_tickets_of_subtree: sum,
-            } = &mut self.binary_tree[parent]
-            {
-                *sum -= ticket_count;
-            }
-        }
+    fn decrease_tickets_count(&mut self, idx: usize, ticket_count: usize) {
+        repeat(())
+            .scan(idx, |current_idx, _| {
+                Self::parent(*current_idx).inspect(|parent_idx| *current_idx = *parent_idx)
+            })
+            .for_each(|idx| {
+                if let BinaryTreeNode::Two {
+                    total_tickets_of_subtree,
+                } = &mut self.binary_tree[idx]
+                {
+                    *total_tickets_of_subtree -= ticket_count;
+                }
+            });
     }
 
     /// Some nodes are not binary tree anymore: they have only one child.
