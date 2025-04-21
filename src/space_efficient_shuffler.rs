@@ -399,15 +399,33 @@ mod tests {
 
     #[test]
     fn test_space_efficient_shuffler_skewed_tickets() {
-        let mut rng = rand::rngs::mock::StepRng::new(1, 0);
-        const MAX_PRIZE_COUNT: usize = 1000;
-        const NUM_USERS: usize = 1001;
+        const MAX_PRIZE_COUNT: usize = 10;
+        const NUM_USERS: usize = MAX_PRIZE_COUNT + 1;
+        const NORMAL_USER_TICKET_COUNT: usize = 1000;
+        let mut rng = rand::rngs::mock::StepRng::new(1, 0); // this would always points to the rightmost in the tree
+        // let mut rng = rand::rng(); // this would almost always success
+        let leftmost_index = 5;
         let prizes =
-            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
+            Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(1).name(format!("{x}")).build()));
         // set the first user would always not have the prize
         let (mut users, log) = (0..NUM_USERS)
-            .map(|u| CapacityOneUser::with_tickets_count(u, if u == 0 { 1 } else { 1000 }))
+            .map(|u| {
+                CapacityOneUser::with_tickets_count(
+                    u,
+                    if u == leftmost_index {
+                        1
+                    } else {
+                        NORMAL_USER_TICKET_COUNT
+                    },
+                )
+            })
             .collect::<(Vec<_>, Vec<_>)>();
+        assert_eq!(
+            users.iter().map(|u| u.ticket_count()).sum::<usize>(),
+            (NUM_USERS - 1) * NORMAL_USER_TICKET_COUNT + 1
+        );
+        assert_eq!(users.iter().filter(|u| u.has_prize()).count(), 0);
+        assert_eq!(prizes.iter().map(|p| p.count()).sum::<usize>(), MAX_PRIZE_COUNT);
         assert_eq!(users.len(), NUM_USERS);
         {
             let mut ses = SpaceEfficientShuffler::new(&mut users);
@@ -424,14 +442,20 @@ mod tests {
             );
         }
         assert_eq!(users.len(), NUM_USERS);
-        assert_eq!(users.iter().filter(|u| u.prize.is_none()).count(), 1);
+        assert_eq!(users.iter().filter(|u| u.has_prize()).count(), NUM_USERS - 1);
+        // in theory, this order is fixed
+        // for (i, p) in prizes.iter().enumerate() {
+        //     assert_eq!(users.iter().find(|u| u.prize == Some(p)).unwrap().key(), prize_order(i));
+        // }
+        assert!(users.iter().find(|u| u.key() == leftmost_index).is_some());
+        assert_eq!(users.iter().find(|u| !u.has_prize()).unwrap().key(), leftmost_index);
         assert_eq!(
-            users
-                .iter()
-                .filter(|u| u.key() == 0)
-                .filter(|u| u.prize.is_none())
-                .count(),
-            1
+            users.iter().find(|u| u.key() == leftmost_index).unwrap().has_prize(),
+            false
         );
     }
+
+    // fn prize_order(i: usize) -> usize {
+    //     i
+    // }
 }

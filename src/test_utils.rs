@@ -48,6 +48,7 @@ impl<'p> GenericUser<'p> {
         )
     }
 
+    #[allow(unused)]
     pub(crate) fn with_tickets_count(uuid: usize, tickets_count: usize) -> (Self, Rc<RefCell<Vec<&'p Prize>>>) {
         let external_log = Rc::new(RefCell::new(vec![]));
         (
