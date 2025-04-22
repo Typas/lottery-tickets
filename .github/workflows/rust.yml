@@ -3,20 +3,38 @@ name: Rust
 on:
   push:
     branches: [ "master" ]
+    paths-ignore:
+      - "examples/**"
   pull_request:
     branches: [ "master" ]
+    paths-ignore:
+      - "examples/**"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
+    name: "Build"
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --workspace --verbose
+      
+  tests:
+    name: "Tests All"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: cargo test --workspace --verbose
+
+  benches:
+    name: "Benchmark Tests"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Test
+      run: cargo test --workspace --benches
