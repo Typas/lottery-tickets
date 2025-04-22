@@ -440,11 +440,8 @@ mod tests {
         }
         assert_eq!(entrants.len(), NUM_ENTRANTS);
         assert_eq!(entrants.iter().filter(|u| u.has_prize()).count(), NUM_ENTRANTS - 1);
-        assert!(entrants.iter().find(|u| u.key() == poor_index).is_some());
+        assert!(entrants.iter().any(|u| u.key() == poor_index));
         assert_eq!(entrants.iter().find(|u| !u.has_prize()).unwrap().key(), poor_index);
-        assert_eq!(
-            entrants.iter().find(|u| u.key() == poor_index).unwrap().has_prize(),
-            false
-        );
+        assert!(!entrants.iter().find(|u| u.key() == poor_index).unwrap().has_prize());
     }
 }
