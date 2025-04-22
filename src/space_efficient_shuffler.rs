@@ -1,16 +1,16 @@
 use std::{iter::Peekable, num::NonZeroUsize};
 
-use crate::{prize::Prize, user::User};
+use crate::{prize::Prize, entrant::Entrant};
 use rand::Rng;
-pub(crate) struct SpaceEfficientShuffler<'user, U> {
-    /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete user.
+pub(crate) struct SpaceEfficientShuffler<'entrant, U> {
+    /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete entrant.
     ///
-    /// All nodes are token for some subset of users.
+    /// All nodes are token for some subset of entrants.
     /// Children of a node are partitions of that node:
     /// they are disjoint subsets of the node and union of children is the node itself.
     ///
     /// See also `BinaryTreeNode`.
-    binary_tree: Vec<BinaryTreeNode<'user, U>>,
+    binary_tree: Vec<BinaryTreeNode<'entrant, U>>,
 }
 
 #[derive(Debug)]
@@ -40,9 +40,9 @@ enum BinaryTreeNode<'u, U> {
     Leaf(&'u mut U),
 }
 
-impl<'prize, 'user, U: User<'prize> + 'prize> SpaceEfficientShuffler<'user, U>
+impl<'prize, 'entrant, U: Entrant<'prize> + 'prize> SpaceEfficientShuffler<'entrant, U>
 where
-    'prize: 'user,
+    'prize: 'entrant,
 {
     const ERR_DATA_INCONSISTENT: &'static str = "Data strucutre inconsistent";
 
@@ -67,16 +67,16 @@ where
     /// Make `SpaceEfficientShuffler::binary_tree` a _complete binary tree_,
     /// in which all internal nodes are `BinaryTreeNode::Two`,
     /// and all leaf nodes are `BinaryTreeNode::Leaf`
-    pub(crate) fn new(iter: impl IntoIterator<Item = &'user mut U>) -> Self {
+    pub(crate) fn new(iter: impl IntoIterator<Item = &'entrant mut U>) -> Self {
         let iter = iter.into_iter();
         let mut binary_tree = Vec::with_capacity(iter.size_hint().0 * 2);
         binary_tree.extend(iter.map(BinaryTreeNode::Leaf));
         if binary_tree.is_empty() {
-            // early return s.t. later we may assume non-zero user count
+            // early return s.t. later we may assume non-zero entrant count
             return Self { binary_tree };
         } else {
             // to make a complete binary tree in which leaf node iff `BinaryTreeNode::Leaf`,
-            // # of internal nodes is exactly one less than (# of leafs i.e. # of users)
+            // # of internal nodes is exactly one less than (# of leafs i.e. # of entrants)
             let mut internal_nodes =
                 Vec::from_iter(std::iter::repeat_n((), binary_tree.len() - 1).map(|_| BinaryTreeNode::None));
             binary_tree = {
@@ -90,7 +90,7 @@ where
         /// internal nodes in a complete binary tree all have two children
         ///
         /// Input should be valid indices only.
-        fn init_at<'u, U: User<'u> + 'u>(i: usize, v: &mut [BinaryTreeNode<U>]) {
+        fn init_at<'u, U: Entrant<'u> + 'u>(i: usize, v: &mut [BinaryTreeNode<U>]) {
             use crate::space_efficient_shuffler::SpaceEfficientShuffler as SES;
             if let BinaryTreeNode::None = &v[i] {
                 // During initialization, `None` iff internal node,
@@ -133,32 +133,32 @@ where
             }
         }
 
-        // we've early return if there were no users in the first place
+        // we've early return if there were no entrants in the first place
         init_at(0, &mut binary_tree);
         Self { binary_tree }
     }
 
-    /// Each node is either one user or a set of users, as determined by `BinaryTreeNode`.
+    /// Each node is either one entrant or a set of entrants, as determined by `BinaryTreeNode`.
     ///
-    /// Drawing a lucky user is done via traversing down the tree via sequence of binary questions,
+    /// Drawing a lucky entrant is done via traversing down the tree via sequence of binary questions,
     /// based on left/right tickets count,
-    /// till a node that is exactly one user is found.
+    /// till a node that is exactly one entrant is found.
     ///
-    /// During the walk till the lucky user, we may find `BinaryTreeNode::One`,
+    /// During the walk till the lucky entrant, we may find `BinaryTreeNode::One`,
     /// which is residual from `Self::cleanup_after_purge_node`,
     /// meaning exactly one of its left or right child/children is present,
     /// in which case we may try jump to next "interesting" descendant
     /// and record where we jumped via modifying the `BinaryTreeNode::One::descendant_idx`,
-    /// for if that descendant is lucky in the sense that one of them are the lucky user,
+    /// for if that descendant is lucky in the sense that one of them are the lucky entrant,
     /// this descendant probably contains a decent amount of tickets,
     /// s.t. this path is probably hot and would probably be walked again.
     ///
-    /// Note it might be the case some user might not admit any more prizes,
+    /// Note it might be the case some entrant might not admit any more prizes,
     /// in which case we should retry from root.
     ///
     /// Return:
-    /// `false` if no more lottery can be drawn, either because of no remaining users or no remaining prizes;
-    /// `true` if successfully picked the lucky user.
+    /// `false` if no more lottery can be drawn, either because of no remaining entrants or no remaining prizes;
+    /// `true` if successfully picked the lucky entrant.
     ///
     /// TODO
     /// implement entropy pool, maybe as simple as caching random numbers.
@@ -216,21 +216,21 @@ where
                     };
                     let ticket_count = u.ticket_count();
                     if ticket_count > 0 && u.add_prize(prize) {
-                        // only advance the iterator if we're sure `impl User` takes it just fine
+                        // only advance the iterator if we're sure `impl Entrant` takes it just fine
                         prizes.next();
                         self.decrease_tickets_count(idx, 1);
                         return true;
                     } else {
-                        // Assuming `User::add_prize` is monotone,
+                        // Assuming `Entrant::add_prize` is monotone,
                         // in the sense once returned `false` it's always `false`,
-                        // we may delete this user from the tree.
+                        // we may delete this entrant from the tree.
                         //
                         // Do _not_ advance the iterator else we'll lose some prizes
                         self.decrease_tickets_count(idx, ticket_count);
                         self.binary_tree[idx] = BinaryTreeNode::None;
                         self.cleanup_after_purge_node(idx);
                         if let BinaryTreeNode::None = &self.binary_tree[0] {
-                            // we've depleted the users/tickets;
+                            // we've depleted the entrants/tickets;
                             // bail out since we don't allow root to be
                             // `BinaryTreeNode::None`,
                             // but we're in an awkward case caused by either
@@ -321,34 +321,34 @@ mod tests {
 
     use super::SpaceEfficientShuffler;
     use crate::prize::PrizeBuilder;
-    use crate::test_utils::CapacityOneUser;
-    use crate::user::User;
+    use crate::test_utils::CapacityOneEntrant;
+    use crate::entrant::Entrant;
 
     #[test]
-    fn test_space_efficient_shuffler_few_users() {
+    fn test_space_efficient_shuffler_few_entrants() {
         let mut rng = rand::rng();
         const MAX_PRIZE_COUNT: usize = 100;
-        const NUM_USERS: usize = 1;
+        const NUM_ENTRANTS: usize = 1;
         let prizes =
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
         {
-            // A single user which doesn't hold any tickets
-            let (mut users, log) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
-            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            // A single entrant which doesn't hold any tickets
+            let (mut entrants, log) = (0..NUM_ENTRANTS).map(CapacityOneEntrant::new).collect::<(Vec<_>, Vec<_>)>();
+            let mut ses = SpaceEfficientShuffler::new(&mut entrants);
             let mut prizes = prizes.iter().peekable();
             let num_iterations = (1..)
                 .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
                 .last()
                 .unwrap_or(0);
-            assert!(log.into_iter().all(|prizes_of_user| prizes_of_user.borrow().is_empty()));
-            // draw, discovering that the user invalid, abort.
-            // this shows when few users/tickets, we finish quickly
+            assert!(log.into_iter().all(|prizes_of_entrant| prizes_of_entrant.borrow().is_empty()));
+            // draw, discovering that the entrant invalid, abort.
+            // this shows when few entrants/tickets, we finish quickly
             assert_eq!(num_iterations, 0);
         }
         {
-            // A single user which holds exactly one ticket
-            let (mut users, log) = (1..=NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
-            let mut ses = SpaceEfficientShuffler::new(&mut users);
+            // A single entrant which holds exactly one ticket
+            let (mut entrants, log) = (1..=NUM_ENTRANTS).map(CapacityOneEntrant::new).collect::<(Vec<_>, Vec<_>)>();
+            let mut ses = SpaceEfficientShuffler::new(&mut entrants);
             let mut prizes = prizes.iter().peekable();
             let num_iterations = (1..)
                 .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
@@ -356,33 +356,33 @@ mod tests {
                 .unwrap_or(0);
             assert_eq!(
                 log.into_iter()
-                    .map(|prizes_of_user| prizes_of_user.borrow().len())
+                    .map(|prizes_of_entrant| prizes_of_entrant.borrow().len())
                     .sum::<usize>(),
                 1
             );
             // draw, ok.
-            // draw, discovering that the user invalid, abort.
-            // this shows when few users/tickets, we finish quickly
+            // draw, discovering that the entrant invalid, abort.
+            // this shows when few entrants/tickets, we finish quickly
             assert_eq!(num_iterations, 1)
         }
     }
 
     #[test]
-    fn test_space_efficient_shuffler_capacity_one_user() {
+    fn test_space_efficient_shuffler_capacity_one_entrant() {
         let mut rng = rand::rng();
         const MAX_PRIZE_COUNT: usize = 100;
-        const NUM_USERS: usize = 65536;
+        const NUM_ENTRANTS: usize = 65536;
         let prizes =
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
-        let (mut users, log) = (0..NUM_USERS).map(CapacityOneUser::new).collect::<(Vec<_>, Vec<_>)>();
-        let mut ses = SpaceEfficientShuffler::new(&mut users);
+        let (mut entrants, log) = (0..NUM_ENTRANTS).map(CapacityOneEntrant::new).collect::<(Vec<_>, Vec<_>)>();
+        let mut ses = SpaceEfficientShuffler::new(&mut entrants);
         let mut prizes = prizes.iter().peekable();
         while ses.try_draw_one(&mut rng, &mut prizes) {}
         assert_eq!(
-            BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
-                let prizes_of_user = prizes_of_user.borrow();
-                assert!(prizes_of_user.len() <= 1);
-                prizes_of_user.iter().next().map(|p| p.name()).map(String::from)
+            BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_entrant| {
+                let prizes_of_entrant = prizes_of_entrant.borrow();
+                assert!(prizes_of_entrant.len() <= 1);
+                prizes_of_entrant.iter().next().map(|p| p.name()).map(String::from)
             })),
             BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
         );
@@ -391,41 +391,41 @@ mod tests {
     #[test]
     fn test_space_efficient_shuffler_skewed_tickets() {
         const MAX_PRIZE_COUNT: usize = 10;
-        const NUM_USERS: usize = MAX_PRIZE_COUNT + 1;
-        const NORMAL_USER_TICKET_COUNT: usize = 1000;
+        const NUM_ENTRANTS: usize = MAX_PRIZE_COUNT + 1;
+        const NORMAL_ENTRANT_TICKET_COUNT: usize = 1000;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(1); // use small rng with seed to guarantee(?) the result would be the same.
         let poor_index = 0;
         let prizes =
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(1).name(format!("{x}")).build()));
-        // set the first user would always not have the prize
-        let (mut users, log) = (0..NUM_USERS)
-            .map(|u| CapacityOneUser::with_tickets_count(u, if u == poor_index { 1 } else { NORMAL_USER_TICKET_COUNT }))
+        // set the first entrant would always not have the prize
+        let (mut entrants, log) = (0..NUM_ENTRANTS)
+            .map(|u| CapacityOneEntrant::with_tickets_count(u, if u == poor_index { 1 } else { NORMAL_ENTRANT_TICKET_COUNT }))
             .collect::<(Vec<_>, Vec<_>)>();
         assert_eq!(
-            users.iter().map(|u| u.ticket_count()).sum::<usize>(),
-            (NUM_USERS - 1) * NORMAL_USER_TICKET_COUNT + 1
+            entrants.iter().map(|u| u.ticket_count()).sum::<usize>(),
+            (NUM_ENTRANTS - 1) * NORMAL_ENTRANT_TICKET_COUNT + 1
         );
-        assert_eq!(users.iter().filter(|u| u.has_prize()).count(), 0);
+        assert_eq!(entrants.iter().filter(|u| u.has_prize()).count(), 0);
         assert_eq!(prizes.iter().map(|p| p.count()).sum::<usize>(), MAX_PRIZE_COUNT);
-        assert_eq!(users.len(), NUM_USERS);
+        assert_eq!(entrants.len(), NUM_ENTRANTS);
         {
-            let mut ses = SpaceEfficientShuffler::new(&mut users);
-            assert_eq!(ses.binary_tree.len(), NUM_USERS * 2 - 1);
+            let mut ses = SpaceEfficientShuffler::new(&mut entrants);
+            assert_eq!(ses.binary_tree.len(), NUM_ENTRANTS * 2 - 1);
             let mut prizes = prizes.iter().peekable();
             while ses.try_draw_one(&mut rng, &mut prizes) {}
             assert_eq!(
-                BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_user| {
-                    let prizes_of_user = prizes_of_user.borrow();
-                    assert!(prizes_of_user.len() <= 1);
-                    prizes_of_user.iter().next().map(|p| p.name()).map(String::from)
+                BTreeSet::from_iter(log.into_iter().flat_map(|prizes_of_entrant| {
+                    let prizes_of_entrant = prizes_of_entrant.borrow();
+                    assert!(prizes_of_entrant.len() <= 1);
+                    prizes_of_entrant.iter().next().map(|p| p.name()).map(String::from)
                 })),
                 BTreeSet::from_iter((0..MAX_PRIZE_COUNT).map(|x| format!("{x}")))
             );
         }
-        assert_eq!(users.len(), NUM_USERS);
-        assert_eq!(users.iter().filter(|u| u.has_prize()).count(), NUM_USERS - 1);
-        assert!(users.iter().find(|u| u.key() == poor_index).is_some());
-        assert_eq!(users.iter().find(|u| !u.has_prize()).unwrap().key(), poor_index);
-        assert_eq!(users.iter().find(|u| u.key() == poor_index).unwrap().has_prize(), false);
+        assert_eq!(entrants.len(), NUM_ENTRANTS);
+        assert_eq!(entrants.iter().filter(|u| u.has_prize()).count(), NUM_ENTRANTS - 1);
+        assert!(entrants.iter().find(|u| u.key() == poor_index).is_some());
+        assert_eq!(entrants.iter().find(|u| !u.has_prize()).unwrap().key(), poor_index);
+        assert_eq!(entrants.iter().find(|u| u.key() == poor_index).unwrap().has_prize(), false);
     }
 }
