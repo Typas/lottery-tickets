@@ -1,17 +1,17 @@
 use crate::prize::Prize;
-use crate::user::User;
+use crate::entrant::Entrant;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub struct GenericUser<'p> {
+pub struct GenericEntrant<'p> {
     uuid: usize,
     tickets_count: usize,
     prizes: Vec<&'p Prize>,
     log: Rc<RefCell<Vec<&'p Prize>>>,
 }
 
-impl<'p> User<'p> for GenericUser<'p> {
+impl<'p> Entrant<'p> for GenericEntrant<'p> {
     type Key = usize;
     fn key(&self) -> Self::Key {
         self.uuid
@@ -34,7 +34,7 @@ impl<'p> User<'p> for GenericUser<'p> {
     }
 }
 
-impl<'p> GenericUser<'p> {
+impl<'p> GenericEntrant<'p> {
     pub(crate) fn new(uuid: usize) -> (Self, Rc<RefCell<Vec<&'p Prize>>>) {
         let external_log = Rc::new(RefCell::new(vec![]));
         (
@@ -64,14 +64,14 @@ impl<'p> GenericUser<'p> {
 }
 
 #[derive(Debug)]
-pub(crate) struct CapacityOneUser<'p> {
+pub(crate) struct CapacityOneEntrant<'p> {
     uuid: usize,
     tickets_count: usize,
     pub prize: Option<&'p Prize>,
     log: Rc<RefCell<Vec<&'p Prize>>>,
 }
 
-impl<'p> User<'p> for CapacityOneUser<'p> {
+impl<'p> Entrant<'p> for CapacityOneEntrant<'p> {
     type Key = usize;
     fn key(&self) -> Self::Key {
         self.uuid
@@ -94,7 +94,7 @@ impl<'p> User<'p> for CapacityOneUser<'p> {
     }
 }
 
-impl<'p> CapacityOneUser<'p> {
+impl<'p> CapacityOneEntrant<'p> {
     pub(crate) fn new(uuid: usize) -> (Self, Rc<RefCell<Vec<&'p Prize>>>) {
         let external_log = Rc::new(RefCell::new(vec![]));
         (

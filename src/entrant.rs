@@ -3,9 +3,9 @@ use std::hash::Hash;
 use crate::prize::Prize;
 use uuid::Uuid;
 
-pub trait User<'a> {
+pub trait Entrant<'a> {
     type Key: Hash + Eq;
-    /// returns the uuid of the user
+    /// returns the uuid of the Entrant
     fn key(&self) -> Self::Key;
     /// total count of lottery ticket
     fn ticket_count(&self) -> usize;
@@ -15,31 +15,31 @@ pub trait User<'a> {
     /// it's never `true` again,
     /// effectively the implementation cannot be picky about the prizes
     fn add_prize(&mut self, prize: &'a Prize) -> bool;
-    /// check if the user has at least one prize
+    /// check if the Entrant has at least one prize
     fn has_prize(&self) -> bool;
 }
 
-pub struct SinglePrizeUser<'a> {
+pub struct SinglePrizeEntrant<'a> {
     count: usize, // total count of lottery ticket
     name: String,
     id: Uuid,
     prize: Option<&'a Prize>,
 }
 
-pub struct MultiPrizeUser<'a> {
+pub struct MultiPrizeEntrant<'a> {
     count: usize, // total count of lottery ticket
     name: String,
     id: Uuid,
     prizes: Vec<&'a Prize>,
 }
 
-pub struct UserBuilder {
+pub struct EntrantBuilder {
     count: usize, // total count of lottery ticket
     name: Option<String>,
     id: Option<Uuid>,
 }
 
-impl SinglePrizeUser<'_> {
+impl SinglePrizeEntrant<'_> {
     pub fn new(id: Uuid, name: String, ticket_count: usize) -> Self {
         Self {
             count: ticket_count,
@@ -58,7 +58,7 @@ impl SinglePrizeUser<'_> {
     }
 }
 
-impl<'a> User<'a> for SinglePrizeUser<'a> {
+impl<'a> Entrant<'a> for SinglePrizeEntrant<'a> {
     type Key = Uuid;
 
     fn key(&self) -> Self::Key {
@@ -83,7 +83,7 @@ impl<'a> User<'a> for SinglePrizeUser<'a> {
     }
 }
 
-impl MultiPrizeUser<'_> {
+impl MultiPrizeEntrant<'_> {
     pub fn new(id: Uuid, name: String, ticket_count: usize) -> Self {
         Self {
             count: ticket_count,
@@ -102,7 +102,7 @@ impl MultiPrizeUser<'_> {
     }
 }
 
-impl<'a> User<'a> for MultiPrizeUser<'a> {
+impl<'a> Entrant<'a> for MultiPrizeEntrant<'a> {
     type Key = Uuid;
     fn key(&self) -> Self::Key {
         self.id
@@ -122,13 +122,13 @@ impl<'a> User<'a> for MultiPrizeUser<'a> {
     }
 }
 
-impl Default for UserBuilder {
+impl Default for EntrantBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl UserBuilder {
+impl EntrantBuilder {
     pub fn new() -> Self {
         Self {
             name: None,
@@ -152,8 +152,8 @@ impl UserBuilder {
         self
     }
 
-    pub fn build_single<'a>(self) -> SinglePrizeUser<'a> {
-        SinglePrizeUser {
+    pub fn build_single<'a>(self) -> SinglePrizeEntrant<'a> {
+        SinglePrizeEntrant {
             count: self.count,
             name: self.name.unwrap_or_default(),
             id: self.id.unwrap_or_else(Uuid::new_v4),
@@ -161,8 +161,8 @@ impl UserBuilder {
         }
     }
 
-    pub fn build_multiple<'a>(self) -> MultiPrizeUser<'a> {
-        MultiPrizeUser {
+    pub fn build_multiple<'a>(self) -> MultiPrizeEntrant<'a> {
+        MultiPrizeEntrant {
             count: self.count,
             name: self.name.unwrap_or_default(),
             id: self.id.unwrap_or_else(Uuid::new_v4),
