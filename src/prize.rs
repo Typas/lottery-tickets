@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Prize {
     name: String,
     count: usize,
@@ -20,6 +20,12 @@ impl Prize {
 
     pub fn count(&self) -> usize {
         self.count
+    }
+}
+
+impl Default for PrizeBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
