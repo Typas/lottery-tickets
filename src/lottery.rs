@@ -7,7 +7,7 @@ use std::{
 
 use rand::Rng;
 
-use crate::{prize::Prize, space_efficient_shuffler, entrant::Entrant};
+use crate::{entrant::Entrant, prize::Prize, space_efficient_shuffler};
 pub struct Lottery<'entrant, K, U, S = RandomState>
 where
     K: Hash + Eq,

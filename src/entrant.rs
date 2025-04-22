@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 pub trait Entrant<'a> {
     type Key: Hash + Eq;
-    /// returns the uuid of the Entrant
+    /// returns the uuid of the entrant
     fn key(&self) -> Self::Key;
     /// total count of lottery ticket
     fn ticket_count(&self) -> usize;
@@ -15,7 +15,7 @@ pub trait Entrant<'a> {
     /// it's never `true` again,
     /// effectively the implementation cannot be picky about the prizes
     fn add_prize(&mut self, prize: &'a Prize) -> bool;
-    /// check if the Entrant has at least one prize
+    /// check if the entrant has at least one prize
     fn has_prize(&self) -> bool;
 }
 
