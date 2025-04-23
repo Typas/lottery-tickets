@@ -1,6 +1,9 @@
-use std::{iter::Peekable, num::NonZeroUsize};
+use std::{
+    iter::{Peekable, repeat},
+    num::NonZeroUsize,
+};
 
-use crate::{prize::Prize, entrant::Entrant};
+use crate::{entrant::Entrant, prize::Prize};
 use rand::Rng;
 pub(crate) struct SpaceEfficientShuffler<'entrant, U> {
     /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete entrant.
@@ -85,56 +88,48 @@ where
             };
         }
 
-        /// Given internal nodes be `BinaryTreeNode::None` and leaf nodes `BinaryTreeNode::Leaf`,
-        /// make every internal node `BinaryTreeNode::Two`:
-        /// internal nodes in a complete binary tree all have two children
-        ///
-        /// Input should be valid indices only.
-        fn init_at<'u, U: Entrant<'u> + 'u>(i: usize, v: &mut [BinaryTreeNode<U>]) {
-            use crate::space_efficient_shuffler::SpaceEfficientShuffler as SES;
-            if let BinaryTreeNode::None = &v[i] {
-                // During initialization, `None` iff internal node,
-                // and being a complete tree, internal nodes have both childrens,
-                // thus here we may safely assume both left and right are still within boundary
-                init_at(SES::<U>::left(i).get(), v);
-                init_at(SES::<U>::right(i).get(), v);
-                match (&v[SES::<U>::left(i).get()], &v[SES::<U>::right(i).get()]) {
-                    (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
-                        v[i] = BinaryTreeNode::Two {
-                            total_tickets_of_subtree: l.ticket_count() + r.ticket_count(),
-                        }
+        // complete binary tree: (# leaves) = L <=> (# nodes) = 2*L-1
+        // e.g. (# leaves) = 1 => (# nodes) = 1
+        //      (# leaves) = 2 => (# nodes) = 3
+        //      (# leaves) = 3 => (# nodes) = 5
+        //      ...
+        // thus last internal node has index one less than length divided by two.
+        (0..binary_tree.len() / 2).rev().for_each(|idx_internal_node| {
+            match (
+                &binary_tree[Self::left(idx_internal_node).get()],
+                &binary_tree[Self::right(idx_internal_node).get()],
+            ) {
+                (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
+                    binary_tree[idx_internal_node] = BinaryTreeNode::Two {
+                        total_tickets_of_subtree: l.ticket_count() + r.ticket_count(),
+                    }
+                },
+                (
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree: sum,
                     },
-                    (
-                        BinaryTreeNode::Two {
-                            total_tickets_of_subtree: sum,
-                        },
-                        BinaryTreeNode::Leaf(u),
-                    ) => {
-                        v[i] = BinaryTreeNode::Two {
-                            total_tickets_of_subtree: sum + u.ticket_count(),
-                        }
+                    BinaryTreeNode::Leaf(u),
+                ) => {
+                    binary_tree[idx_internal_node] = BinaryTreeNode::Two {
+                        total_tickets_of_subtree: sum + u.ticket_count(),
+                    }
+                },
+                (
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree: l,
                     },
-                    (
-                        BinaryTreeNode::Two {
-                            total_tickets_of_subtree: l,
-                        },
-                        BinaryTreeNode::Two {
-                            total_tickets_of_subtree: r,
-                        },
-                    ) => {
-                        v[i] = BinaryTreeNode::Two {
-                            total_tickets_of_subtree: l + r,
-                        }
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree: r,
                     },
-                    _ => {
-                        panic!("Not a complete binary tree!");
-                    },
-                }
+                ) => {
+                    binary_tree[idx_internal_node] = BinaryTreeNode::Two {
+                        total_tickets_of_subtree: l + r,
+                    }
+                },
+                _ => panic!("{}", Self::ERR_DATA_INCONSISTENT),
             }
-        }
+        });
 
-        // we've early return if there were no entrants in the first place
-        init_at(0, &mut binary_tree);
         Self { binary_tree }
     }
 
@@ -267,16 +262,19 @@ where
     /// keeping the counters (`BinaryTreeNode::Two`) sane.
     ///
     /// Note the node at input index is excluded.
-    fn decrease_tickets_count(&mut self, mut idx: usize, ticket_count: usize) {
-        while let Some(parent) = Self::parent(idx) {
-            idx = parent;
-            if let BinaryTreeNode::Two {
-                total_tickets_of_subtree: sum,
-            } = &mut self.binary_tree[parent]
-            {
-                *sum -= ticket_count;
-            }
-        }
+    fn decrease_tickets_count(&mut self, idx: usize, ticket_count: usize) {
+        repeat(())
+            .scan(idx, |current_idx, _| {
+                Self::parent(*current_idx).inspect(|parent_idx| *current_idx = *parent_idx)
+            })
+            .for_each(|idx| {
+                if let BinaryTreeNode::Two {
+                    total_tickets_of_subtree,
+                } = &mut self.binary_tree[idx]
+                {
+                    *total_tickets_of_subtree -= ticket_count;
+                }
+            });
     }
 
     /// Some nodes are not binary tree anymore: they have only one child.
@@ -320,9 +318,9 @@ mod tests {
     use rand::SeedableRng;
 
     use super::SpaceEfficientShuffler;
+    use crate::entrant::Entrant;
     use crate::prize::PrizeBuilder;
     use crate::test_utils::CapacityOneEntrant;
-    use crate::entrant::Entrant;
 
     #[test]
     fn test_space_efficient_shuffler_few_entrants() {
@@ -333,21 +331,28 @@ mod tests {
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
         {
             // A single entrant which doesn't hold any tickets
-            let (mut entrants, log) = (0..NUM_ENTRANTS).map(CapacityOneEntrant::new).collect::<(Vec<_>, Vec<_>)>();
+            let (mut entrants, log) = (0..NUM_ENTRANTS)
+                .map(CapacityOneEntrant::new)
+                .collect::<(Vec<_>, Vec<_>)>();
             let mut ses = SpaceEfficientShuffler::new(&mut entrants);
             let mut prizes = prizes.iter().peekable();
             let num_iterations = (1..)
                 .take_while(|_| ses.try_draw_one(&mut rng, &mut prizes))
                 .last()
                 .unwrap_or(0);
-            assert!(log.into_iter().all(|prizes_of_entrant| prizes_of_entrant.borrow().is_empty()));
+            assert!(
+                log.into_iter()
+                    .all(|prizes_of_entrant| prizes_of_entrant.borrow().is_empty())
+            );
             // draw, discovering that the entrant invalid, abort.
             // this shows when few entrants/tickets, we finish quickly
             assert_eq!(num_iterations, 0);
         }
         {
             // A single entrant which holds exactly one ticket
-            let (mut entrants, log) = (1..=NUM_ENTRANTS).map(CapacityOneEntrant::new).collect::<(Vec<_>, Vec<_>)>();
+            let (mut entrants, log) = (1..=NUM_ENTRANTS)
+                .map(CapacityOneEntrant::new)
+                .collect::<(Vec<_>, Vec<_>)>();
             let mut ses = SpaceEfficientShuffler::new(&mut entrants);
             let mut prizes = prizes.iter().peekable();
             let num_iterations = (1..)
@@ -374,7 +379,9 @@ mod tests {
         const NUM_ENTRANTS: usize = 65536;
         let prizes =
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(x).name(format!("{x}")).build()));
-        let (mut entrants, log) = (0..NUM_ENTRANTS).map(CapacityOneEntrant::new).collect::<(Vec<_>, Vec<_>)>();
+        let (mut entrants, log) = (0..NUM_ENTRANTS)
+            .map(CapacityOneEntrant::new)
+            .collect::<(Vec<_>, Vec<_>)>();
         let mut ses = SpaceEfficientShuffler::new(&mut entrants);
         let mut prizes = prizes.iter().peekable();
         while ses.try_draw_one(&mut rng, &mut prizes) {}
@@ -399,7 +406,16 @@ mod tests {
             Vec::from_iter((0..MAX_PRIZE_COUNT).map(|x| PrizeBuilder::new().count(1).name(format!("{x}")).build()));
         // set the first entrant would always not have the prize
         let (mut entrants, log) = (0..NUM_ENTRANTS)
-            .map(|u| CapacityOneEntrant::with_tickets_count(u, if u == poor_index { 1 } else { NORMAL_ENTRANT_TICKET_COUNT }))
+            .map(|u| {
+                CapacityOneEntrant::with_tickets_count(
+                    u,
+                    if u == poor_index {
+                        1
+                    } else {
+                        NORMAL_ENTRANT_TICKET_COUNT
+                    },
+                )
+            })
             .collect::<(Vec<_>, Vec<_>)>();
         assert_eq!(
             entrants.iter().map(|u| u.ticket_count()).sum::<usize>(),
@@ -424,8 +440,8 @@ mod tests {
         }
         assert_eq!(entrants.len(), NUM_ENTRANTS);
         assert_eq!(entrants.iter().filter(|u| u.has_prize()).count(), NUM_ENTRANTS - 1);
-        assert!(entrants.iter().find(|u| u.key() == poor_index).is_some());
+        assert!(entrants.iter().any(|u| u.key() == poor_index));
         assert_eq!(entrants.iter().find(|u| !u.has_prize()).unwrap().key(), poor_index);
-        assert_eq!(entrants.iter().find(|u| u.key() == poor_index).unwrap().has_prize(), false);
+        assert!(!entrants.iter().find(|u| u.key() == poor_index).unwrap().has_prize());
     }
 }

@@ -98,7 +98,7 @@ where
 
     /// Set all the entrants in the lottery.
     /// It is possible to have less entrant if the keys collide.
-    pub fn set_entrants<'a, C>(&mut self, entrants: C)
+    pub fn set_entrants<C>(&mut self, entrants: C)
     where
         C: IntoIterator<Item = U>,
     {
