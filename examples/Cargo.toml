@@ -5,12 +5,12 @@ authors = [ "Typas Liao <typascake@gmail.com>" ]
 edition = "2024"
 
 [[example]]
-name = "one_prize_per_user"
-path = "src/one_prize_per_user.rs"
+name = "one_prize_per_entrant"
+path = "src/one_prize_per_entrant.rs"
 
 [[example]]
-name = "unlimited_prizes_per_user"
-path = "src/unlimited_prizes_per_user.rs"
+name = "unlimited_prizes_per_entrant"
+path = "src/unlimited_prizes_per_entrant.rs"
 
 [dependencies.lottery-tickets]
 path = "../"

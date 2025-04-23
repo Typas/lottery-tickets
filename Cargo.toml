@@ -37,6 +37,6 @@ features = [
 members = [
     "examples",
     "tests/smoke-test",
-    "tests/single-prize-user-test",
-    "tests/multi-prize-user-test",
+    "tests/single-prize-entrant-test",
+    "tests/multi-prize-entrant-test",
 ]
