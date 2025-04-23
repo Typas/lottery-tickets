@@ -2,12 +2,41 @@
 name = "lottery-tickets"
 version = "0.1.0"
 edition = "2024"
+authors = [
+    "Typas Liao<typascake@gmail.com>",
+]
+categories = [
 
-[dependencies]
-rand = "0.9"
+]
+description = "A lottery library for fixed amount of tickets and prizes."
+documentation = "https://github.com/Typas/lottery-tickets"
+include = [
+    "src",
+    "README.md",
+    "LICENSE",
+]
+keywords = [
+
+]
+license = "MIT"
+homepage = "https://github.com/Typas/lottery-tickets"
+readme = "README.md"
+repository = "https://github.com/Typas/lottery-tickets"
+rust-version = "1.85.0"
+
+[dependencies.rand]
+version = "0.9"
 
 [dependencies.uuid]
 version = "1.16"
 features = [
     "v4",
+]
+
+[workspace]
+members = [
+    "examples",
+    "tests/smoke-test",
+    "tests/single-prize-entrant-test",
+    "tests/multi-prize-entrant-test",
 ]

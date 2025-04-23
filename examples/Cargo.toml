@@ -1,0 +1,16 @@
+[package]
+name = "lottery-tickets-examples"
+version = "0.0.0"
+authors = [ "Typas Liao <typascake@gmail.com>" ]
+edition = "2024"
+
+[[example]]
+name = "one_prize_per_entrant"
+path = "src/one_prize_per_entrant.rs"
+
+[[example]]
+name = "unlimited_prizes_per_entrant"
+path = "src/unlimited_prizes_per_entrant.rs"
+
+[dependencies.lottery-tickets]
+path = "../"
