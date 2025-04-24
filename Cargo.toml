@@ -40,3 +40,4 @@ members = [
     "tests/single-prize-entrant-test",
     "tests/multi-prize-entrant-test",
 ]
+exclude = ["benches"]
