@@ -16,5 +16,5 @@ name = "single-prize"
 harness = false
 
 [[bench]]
-name = "all-prize"
+name = "multiple-prize"
 harness = false
