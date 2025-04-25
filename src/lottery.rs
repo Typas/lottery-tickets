@@ -148,7 +148,7 @@ where
         if array_est <= tree_est * tree_factor {
             self.shuffle_tree(rng);
         } else {
-            self.shuffle_array(rng);
+            self.shuffle_array(rng, array_est);
         }
     }
 
@@ -171,7 +171,7 @@ where
     }
 
     /// Shuffle the slots and distribute the prizes to the entrants.
-    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R)
+    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R, num_tickets: usize)
     where
         R: Rng,
         'myself: 'u,
@@ -182,25 +182,20 @@ where
             return;
         }
 
+        let keys = self.entrants.values().map(Entrant::key).collect::<Vec<_>>();
         // Shuffle the slots, each entrant has `entrant.ticket_count()` slots.
         // Use the entrant's key to point back to itself.
         // The complexity shuffling would be both O(n).
         let tickets_god_only_knows_which_entrant = {
             use rand::seq::SliceRandom;
-            let mut ret = Vec::from_iter(
+            let mut ret =
                 self.entrants
                     .values()
-                    // FIXME:
-                    // I suspect insisting keys to be `Clone` be more straightforward and cheaper
-                    // than triggering (potentially expensive) hash algorithm each time...?
-                    // BUT
-                    // there may be some hash algorithms that are expensive to calculate
-                    // and expensive to clone...
-                    .flat_map(|entrant| {
-                        // HACK: calculate hash each time to circumvent lifetime of keys of the map
-                        repeat_n((), entrant.ticket_count()).map(|_| entrant.key())
-                    }),
-            );
+                    .zip(&keys)
+                    .fold(Vec::with_capacity(num_tickets), |mut ret, (entrant, key)| {
+                        ret.extend(repeat_n(key, entrant.ticket_count()));
+                        ret
+                    });
             ret.shuffle(rng);
             ret
         };
