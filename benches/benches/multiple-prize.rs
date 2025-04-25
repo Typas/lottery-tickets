@@ -69,7 +69,7 @@ pub fn bench(c: &mut Criterion) {
     const NUM_ENTRANTS: usize = 65536;
     const FACTOR: usize = 3;
     {
-        let mut g = c.benchmark_group("large_t_large_p");
+        let mut g = c.benchmark_group("multiple_large_t_large_p");
         g.measurement_time(Duration::from_secs(30)).sample_size(50);
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
@@ -96,7 +96,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("large_t_medium_p");
+        let mut g = c.benchmark_group("multiple_large_t_medium_p");
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = NUM_ENTRANTS;
         g.measurement_time(Duration::from_secs(10));
@@ -123,7 +123,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("large_t_small_p");
+        let mut g = c.benchmark_group("multiple_large_t_small_p");
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
         g.measurement_time(Duration::from_secs(10));
@@ -150,7 +150,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("medium_t_large_p");
+        let mut g = c.benchmark_group("multiple_medium_t_large_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
@@ -176,7 +176,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("medium_t_medium_p");
+        let mut g = c.benchmark_group("multiple_medium_t_medium_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS;
         g.bench_function("array", |b| {
@@ -202,7 +202,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("medium_t_small_p");
+        let mut g = c.benchmark_group("multiple_medium_t_small_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
@@ -228,7 +228,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("medium_t_small_p_std_rng");
+        let mut g = c.benchmark_group("multiple_medium_t_small_p_std_rng");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
