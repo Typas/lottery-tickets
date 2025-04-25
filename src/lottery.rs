@@ -2,16 +2,14 @@ use std::{
     collections::HashMap,
     hash::{Hash, RandomState},
     iter::repeat_n,
-    marker::PhantomData,
 };
 
 use rand::Rng;
 
 use crate::{entrant::Entrant, prize::Prize, space_efficient_shuffler};
-pub struct Lottery<'entrant, K, U, S = RandomState>
+pub struct Lottery<K, U, S = RandomState>
 where
     K: Hash + Eq,
-    U: Entrant<'entrant, Key = K>,
 {
     /// Determine whether the lottery has been shuffled and done.
     shuffled: bool,
@@ -19,35 +17,26 @@ where
     entrants: HashMap<K, U, S>,
     /// The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
-    /// The lifetime is actually refering to those `impl Entrant` in the map,
-    /// which in turn is referring to `Prize` in this exact struct (`Self::prizes`)
-    ///
-    /// Rust complains if not explicitly used in any of the fields,
-    /// thus the marker.
-    _marker: PhantomData<&'entrant U>,
 }
 
-impl<'u, K, U> Default for Lottery<'u, K, U>
+impl<'u, K, U> Default for Lottery<K, U>
 where
     K: Hash + Eq,
-    U: Entrant<'u, Key = K>,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'u, K, U> Lottery<'u, K, U>
+impl<'u, K, U> Lottery<K, U>
 where
     K: Hash + Eq,
-    U: Entrant<'u, Key = K>,
 {
     pub fn new() -> Self {
         Self {
             entrants: HashMap::new(),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -56,12 +45,11 @@ where
             entrants: HashMap::with_capacity(cap),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 }
 
-impl<'u, K, U, S> Lottery<'u, K, U, S>
+impl<'u, K, U, S> Lottery<K, U, S>
 where
     K: Hash + Eq,
     U: Entrant<'u, Key = K>,
@@ -72,7 +60,6 @@ where
             entrants: HashMap::with_capacity_and_hasher(cap, hasher),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -81,7 +68,6 @@ where
             entrants: HashMap::with_hasher(hasher),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
