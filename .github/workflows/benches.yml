@@ -1,0 +1,27 @@
+name: Benches
+
+on:
+  push:
+    branches: [ "master" ]
+    paths-ignore:
+      - "examples/**"
+  pull_request:
+    branches: [ "master" ]
+    paths-ignore:
+      - "examples/**"
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    working-directory: ./benches
+
+jobs:
+  benches:
+    name: "Benchmark Tests"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Test
+      run: cargo test --benches
