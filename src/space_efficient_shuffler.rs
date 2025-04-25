@@ -5,24 +5,24 @@ use std::{
 
 use crate::{entrant::Entrant, prize::Prize};
 use rand::Rng;
-pub(crate) struct SpaceEfficientShuffler<'entrant, U> {
+pub(crate) struct SpaceEfficientShuffler<'e, E> {
     /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete entrant.
     ///
-    /// All nodes are token for some subset of entrants.
+    /// All nodes are tokens for some subset of entrants.
     /// Children of a node are partitions of that node:
     /// they are disjoint subsets of the node and union of children is the node itself.
     ///
     /// See also `BinaryTreeNode`.
-    binary_tree: Vec<BinaryTreeNode<'entrant, U>>,
+    binary_tree: Vec<BinaryTreeNode<'e, E>>,
 }
 
 #[derive(Debug)]
-enum BinaryTreeNode<'u, U> {
+enum BinaryTreeNode<'e, E> {
     /// Either initialization stub, or `Leaf` just got purged after `SpaceEfficientShuffler::draw_one`.
-    /// See also `SpaceEfficientShuffler::cleanup_after_purge_node`.
+    /// See also `SpaceEfficientShuffler::trim`.
     /// A transient state: no valid node would be such that both its children are `None`.
     None,
-    /// Artifact of both `SpaceEfficientShuffler::draw_one` and `SpaceEfficientShuffler::cleanup_after_purge_node`:
+    /// Artifact of both `SpaceEfficientShuffler::draw_one` and `SpaceEfficientShuffler::trim`:
     /// exactly one of its children is `None`,
     /// and `descendant_idx` points us towards the next interesting descendant.
     One {
@@ -37,10 +37,12 @@ enum BinaryTreeNode<'u, U> {
         descendant_idx: NonZeroUsize,
     },
     /// This node has two children.
-    Two {
-        total_tickets_of_subtree: usize,
+    Two { total_tickets_of_subtree: NonZeroUsize },
+    /// We store only those entrants who have tickets.
+    Leaf {
+        entrant: &'e mut E,
+        ticket_count: NonZeroUsize,
     },
-    Leaf(&'u mut U),
 }
 
 impl<'prize, 'entrant, U: Entrant<'prize> + 'prize> SpaceEfficientShuffler<'entrant, U>
@@ -73,7 +75,12 @@ where
     pub(crate) fn new(iter: impl IntoIterator<Item = &'entrant mut U>) -> Self {
         let iter = iter.into_iter();
         let mut binary_tree = Vec::with_capacity(iter.size_hint().0 * 2);
-        binary_tree.extend(iter.map(BinaryTreeNode::Leaf));
+        binary_tree.extend(iter.flat_map(|u| {
+            NonZeroUsize::new(u.ticket_count()).map(|ticket_count| BinaryTreeNode::Leaf {
+                entrant: u,
+                ticket_count,
+            })
+        }));
         if binary_tree.is_empty() {
             // early return s.t. later we may assume non-zero entrant count
             return Self { binary_tree };
@@ -99,19 +106,19 @@ where
                 &binary_tree[Self::left(idx_internal_node).get()],
                 &binary_tree[Self::right(idx_internal_node).get()],
             ) {
-                (BinaryTreeNode::Leaf(l), BinaryTreeNode::Leaf(r)) => {
+                (BinaryTreeNode::Leaf { ticket_count: l, .. }, BinaryTreeNode::Leaf { ticket_count: r, .. }) => {
                     binary_tree[idx_internal_node] = BinaryTreeNode::Two {
-                        total_tickets_of_subtree: l.ticket_count() + r.ticket_count(),
+                        total_tickets_of_subtree: l.checked_add(r.get()).unwrap(),
                     }
                 },
                 (
                     BinaryTreeNode::Two {
                         total_tickets_of_subtree: sum,
                     },
-                    BinaryTreeNode::Leaf(u),
+                    BinaryTreeNode::Leaf { ticket_count: r, .. },
                 ) => {
                     binary_tree[idx_internal_node] = BinaryTreeNode::Two {
-                        total_tickets_of_subtree: sum + u.ticket_count(),
+                        total_tickets_of_subtree: sum.checked_add(r.get()).unwrap(),
                     }
                 },
                 (
@@ -123,7 +130,7 @@ where
                     },
                 ) => {
                     binary_tree[idx_internal_node] = BinaryTreeNode::Two {
-                        total_tickets_of_subtree: l + r,
+                        total_tickets_of_subtree: l.checked_add(r.get()).unwrap(),
                     }
                 },
                 _ => panic!("{}", Self::ERR_DATA_INCONSISTENT),
@@ -140,7 +147,7 @@ where
     /// till a node that is exactly one entrant is found.
     ///
     /// During the walk till the lucky entrant, we may find `BinaryTreeNode::One`,
-    /// which is residual from `Self::cleanup_after_purge_node`,
+    /// which is residual from `Self::trim`,
     /// meaning exactly one of its left or right child/children is present,
     /// in which case we may try jump to next "interesting" descendant
     /// and record where we jumped via modifying the `BinaryTreeNode::One::descendant_idx`,
@@ -167,14 +174,28 @@ where
         prizes: &mut Peekable<impl Iterator<Item = &'prize Prize>>,
     ) -> bool {
         // if no prizes, just bail out with error
+        // remember to advance the iterator if some lucky entrant were found
         let Some(prize) = prizes.peek() else { return false };
+        // if no entrants/tickets, again bail out with error
+        if self.binary_tree.is_empty() {
+            return false;
+        };
 
         let mut idx = 0;
         loop {
             // ugly indexing to circumvent `&mut` lifetime
             // TODO: refactor
             match &self.binary_tree[idx] {
-                BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
+                BinaryTreeNode::None if idx == 0 => {
+                    // This only happens if all the entrants run out of tickets,
+                    // caused by `Self::trim`.
+                    return false;
+                },
+                BinaryTreeNode::None => {
+                    // `BinaryTreeNode::None` should be transient:
+                    // they shall be absent from this function
+                    panic!("{}", Self::ERR_DATA_INCONSISTENT);
+                },
                 BinaryTreeNode::One { descendant_idx } => {
                     let mut next_interesting_idx = descendant_idx.get();
                     while let BinaryTreeNode::One { descendant_idx } = &self.binary_tree[next_interesting_idx] {
@@ -195,25 +216,28 @@ where
                     // contains the total sum of tickets of both of its children.
                     // (See also `SpaceEfficientShuffler` and `BinaryTreeNode::Two`)
                     //
-                    // Say left has L tickets, right has R tickets, we know `sum` is just (L+R),
+                    // Say left has L tickets, right has R tickets, we know `total_tickets_of_subtree` is just (L+R),
                     // then a fair choice is simply generate a random number G (uniformly) between 0 and (L+R),
                     // and if G less than L, we choose the left subset,
                     // otherwise we choose the right subset.
-                    idx = if rng.random_range(..*total_tickets_of_subtree) < left_ticket_count {
+                    idx = if rng.random_range(..total_tickets_of_subtree.get()) < left_ticket_count.get() {
                         left.get()
                     } else {
                         Self::right(idx).get()
                     };
                 },
-                BinaryTreeNode::Leaf(..) => {
-                    let BinaryTreeNode::Leaf(u) = &mut self.binary_tree[idx] else {
-                        panic!()
+                BinaryTreeNode::Leaf { .. } => {
+                    let &mut BinaryTreeNode::Leaf {
+                        ref mut entrant,
+                        ticket_count,
+                        ..
+                    } = &mut self.binary_tree[idx]
+                    else {
+                        unreachable!()
                     };
-                    let ticket_count = u.ticket_count();
-                    if ticket_count > 0 && u.add_prize(prize) {
-                        // only advance the iterator if we're sure `impl Entrant` takes it just fine
+                    if entrant.add_prize(prize) {
                         prizes.next();
-                        self.decrease_tickets_count(idx, 1);
+                        self.decrease_tickets_count(idx, NonZeroUsize::new(1).unwrap());
                         return true;
                     } else {
                         // Assuming `Entrant::add_prize` is monotone,
@@ -222,30 +246,18 @@ where
                         //
                         // Do _not_ advance the iterator else we'll lose some prizes
                         self.decrease_tickets_count(idx, ticket_count);
-                        self.binary_tree[idx] = BinaryTreeNode::None;
-                        self.cleanup_after_purge_node(idx);
-                        if let BinaryTreeNode::None = &self.binary_tree[0] {
-                            // we've depleted the entrants/tickets;
-                            // bail out since we don't allow root to be
-                            // `BinaryTreeNode::None`,
-                            // but we're in an awkward case caused by either
-                            // 1. Tree has exactly one node s.t. root is leaf
-                            // 2. `SpaceEfficientShuffler::cleanup_after_purge_node`
-                            return false;
-                        } else {
-                            // restart from root all over again,
-                            // for all the probabilities based on which we choose path
-                            // traversing down the tree are wrong.
-                            idx = 0;
-                            continue; // not necessary, just clarifying retrying from root
-                        }
+                        // restart from root all over again,
+                        // for all the probabilities based on which we chose
+                        // this exact path traversing down the tree are wrong.
+                        idx = 0;
+                        continue; // not necessary, just clarifying retrying from root
                     }
                 },
             }
         }
     }
 
-    fn get_key_count_at_idx(&self, mut idx: NonZeroUsize) -> usize {
+    fn get_key_count_at_idx(&self, mut idx: NonZeroUsize) -> NonZeroUsize {
         loop {
             match &self.binary_tree[idx.get()] {
                 BinaryTreeNode::Two {
@@ -253,40 +265,68 @@ where
                 } => break *sum,
                 BinaryTreeNode::One { descendant_idx } => idx = *descendant_idx,
                 BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
-                BinaryTreeNode::Leaf(u) => break u.ticket_count(),
+                BinaryTreeNode::Leaf { ticket_count, .. } => break *ticket_count,
             }
         }
     }
 
-    /// Remove tickets from all the ancestor nodes,
+    /// Remove tickets from all the ancestor nodes including self,
     /// keeping the counters (`BinaryTreeNode::Two`) sane.
     ///
-    /// Note the node at input index is excluded.
-    fn decrease_tickets_count(&mut self, idx: usize, ticket_count: usize) {
+    /// Input index must be `BinaryTreeNode::Leaf`.
+    fn decrease_tickets_count(&mut self, idx: usize, decrement: NonZeroUsize) {
         repeat(())
-            .scan(idx, |current_idx, _| {
-                Self::parent(*current_idx).inspect(|parent_idx| *current_idx = *parent_idx)
-            })
-            .for_each(|idx| {
-                if let BinaryTreeNode::Two {
-                    total_tickets_of_subtree,
-                } = &mut self.binary_tree[idx]
-                {
-                    *total_tickets_of_subtree -= ticket_count;
+            .scan(idx, |jdx, _| {
+                // the input index should be taken care of
+                let current_idx = *jdx;
+                let parent_idx = Self::parent(*jdx).inspect(|parrent_idx| *jdx = *parrent_idx);
+                match &mut self.binary_tree[current_idx] {
+                    BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
+                    BinaryTreeNode::One { .. } => {},
+                    BinaryTreeNode::Two {
+                        total_tickets_of_subtree,
+                    } => {
+                        *total_tickets_of_subtree = total_tickets_of_subtree
+                            .get()
+                            .checked_sub(decrement.get())
+                            .and_then(NonZeroUsize::new)
+                            .unwrap();
+                    },
+                    BinaryTreeNode::Leaf { ticket_count, .. } => {
+                        if let Some(t_c) = ticket_count
+                            .get()
+                            .checked_sub(decrement.get())
+                            .and_then(NonZeroUsize::new)
+                        {
+                            *ticket_count = t_c;
+                        } else {
+                            self.binary_tree[current_idx] = BinaryTreeNode::None;
+                        }
+                    },
                 }
-            });
+                parent_idx
+            })
+            // work is done in `Iterator::scan`; still, we need to consume the iterator
+            .count();
+
+        if let BinaryTreeNode::None = &self.binary_tree[idx] {
+            self.trim(idx);
+        }
     }
 
-    /// Some nodes are not binary tree anymore: they have only one child.
-    /// Trim them s.t. we don't have to traverse down the tree next time.
+    /// New `BinaryTreeNode::None` is produced as a side product of `Self::decrease_tickets_count`;
+    /// update the ancestors, i.e.
+    /// `BinaryTreeNode::Two` -> `BinaryTreeNode::One`,
+    /// `BinaryTreeNode::One` -> `BinaryTreeNode::None`,
+    /// if appropriate.
     ///
     /// N.B.
-    /// The input index should point to `BinaryTreeNode::None`.
     /// The ticket counters are assumed to be valid and thus _not_ modified.
-    fn cleanup_after_purge_node(&mut self, mut i: usize) {
-        while let (Some(parent_idx), BinaryTreeNode::None) = (Self::parent(i), &self.binary_tree[i]) {
+    /// Input must be valid index.
+    fn trim(&mut self, mut i: usize) {
+        while let (BinaryTreeNode::None, Some(parent_idx)) = (&self.binary_tree[i], Self::parent(i)) {
             match &mut self.binary_tree[parent_idx] {
-                BinaryTreeNode::None | BinaryTreeNode::Leaf(_) => panic!("{}", Self::ERR_DATA_INCONSISTENT),
+                BinaryTreeNode::Leaf { .. } | BinaryTreeNode::None => panic!("{}", Self::ERR_DATA_INCONSISTENT),
                 one @ BinaryTreeNode::One { .. } => {
                     // The parent `BinaryTreeNode::One` used to point to either
                     // `BinaryTreeNode::One` or `BinaryTreeNode::Leaf`,
@@ -295,7 +335,7 @@ where
                     *one = BinaryTreeNode::None;
                     i = parent_idx;
                 },
-                two @ &mut BinaryTreeNode::Two { .. } => {
+                two @ BinaryTreeNode::Two { .. } => {
                     // Lazy: we don't care what's the sibling,
                     // for the `SpaceEfficientShuffler::draw_one` would trim them as they see fit:
                     // if that sibling has few tickets, it might not be accessed ever again anyway
