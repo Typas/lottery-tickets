@@ -11,34 +11,14 @@ criterion_group!(
 );
 criterion_main!(benches);
 
-macro_rules! bench_iter_single_array {
-    ($bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
-        bench_iter_single!(
-            $bench_func,
-            $rng,
-            shuffle_array,
-            $nr_prize,
-            $nr_per_prize,
-            $ticket_per_user
-        );
-    };
-}
-
-macro_rules! bench_iter_single_tree {
-    ($bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
-        bench_iter_single!(
-            $bench_func,
-            $rng,
-            shuffle_tree,
-            $nr_prize,
-            $nr_per_prize,
-            $ticket_per_user
-        );
-    };
-}
-
 macro_rules! bench_iter_single {
-    ($bench_func: ident, $rng: ident, $shuffle_func: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
+    (array $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
+        bench_iter_single!(@inner $bench_func, $rng, shuffle_array, $nr_prize, $nr_per_prize, $ticket_per_user)
+    };
+    (tree $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
+        bench_iter_single!(@inner $bench_func, $rng, shuffle_tree, $nr_prize, $nr_per_prize, $ticket_per_user)
+    };
+    (@inner $bench_func: ident, $rng: ident, $shuffle_func: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
         $bench_func.iter(|| {
             let prizes = Vec::from_iter(
                 (0..$nr_prize).map(|x| PrizeBuilder::new().count($nr_per_prize).name(format!("{x}")).build()),
@@ -76,7 +56,7 @@ pub fn bench(c: &mut Criterion) {
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -87,7 +67,7 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
@@ -103,7 +83,7 @@ pub fn bench(c: &mut Criterion) {
         g.measurement_time(Duration::from_secs(10));
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -114,7 +94,7 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
@@ -130,7 +110,7 @@ pub fn bench(c: &mut Criterion) {
         g.measurement_time(Duration::from_secs(10));
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -141,7 +121,7 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
@@ -156,7 +136,7 @@ pub fn bench(c: &mut Criterion) {
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -167,7 +147,7 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
@@ -182,7 +162,7 @@ pub fn bench(c: &mut Criterion) {
         let nr_prize = NUM_ENTRANTS;
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -193,7 +173,33 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
+                b,
+                rng,
+                nr_prize,
+                1.max(nr_prize / NUM_ENTRANTS),
+                1.max(nr_ticket / NUM_ENTRANTS)
+            );
+        });
+    }
+    {
+        let mut g = c.benchmark_group("single_medium_t_medium_p_std_rng");
+        let nr_ticket = NUM_ENTRANTS;
+        let nr_prize = NUM_ENTRANTS;
+        g.bench_function("array", |b| {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+            bench_iter_single!(array
+                b,
+                rng,
+                nr_prize,
+                1.max(nr_prize / NUM_ENTRANTS),
+                1.max(nr_ticket / NUM_ENTRANTS)
+            );
+        });
+
+        g.bench_function("tree", |b| {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
@@ -208,7 +214,7 @@ pub fn bench(c: &mut Criterion) {
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -219,7 +225,7 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
@@ -234,7 +240,7 @@ pub fn bench(c: &mut Criterion) {
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
             let mut rng = rand::rngs::StdRng::seed_from_u64(1);
-            bench_iter_single_array!(
+            bench_iter_single!(array
                 b,
                 rng,
                 nr_prize,
@@ -245,7 +251,7 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = rand::rngs::StdRng::seed_from_u64(1);
-            bench_iter_single_tree!(
+            bench_iter_single!(tree
                 b,
                 rng,
                 nr_prize,
