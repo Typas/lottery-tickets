@@ -148,7 +148,7 @@ where
         if array_est <= tree_est * tree_factor {
             self.shuffle_tree(rng);
         } else {
-            self.shuffle_array(rng, array_est);
+            self.shuffle_array_inner(rng, array_est);
         }
     }
 
@@ -170,8 +170,17 @@ where
         while space_efficient_shuffler.try_draw_one(rng, &mut prizes) {}
     }
 
+    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R)
+    where
+        R: Rng,
+        'myself: 'u,
+    {
+        let total_ticket_count: usize = self.entrants.values().map(|u| u.ticket_count()).sum();
+        self.shuffle_array_inner(rng, total_ticket_count);
+    }
+
     /// Shuffle the slots and distribute the prizes to the entrants.
-    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R, num_tickets: usize)
+    fn shuffle_array_inner<'myself, R>(&'myself mut self, rng: &mut R, num_tickets: usize)
     where
         R: Rng,
         'myself: 'u,
