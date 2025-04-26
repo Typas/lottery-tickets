@@ -17,13 +17,7 @@ criterion_group!(
 criterion_main!(benches);
 
 macro_rules! bench_iter_multiple {
-    (array $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
-        bench_iter_multiple!(@inner $bench_func, $rng, shuffle_array, $nr_prize, $nr_per_prize, $ticket_per_user)
-    };
-    (tree $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
-        bench_iter_multiple!(@inner $bench_func, $rng, shuffle_tree, $nr_prize, $nr_per_prize, $ticket_per_user)
-    };
-    (@inner $bench_func: ident, $rng: ident, $shuffle_func: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
+    ($shuffle_func: ident, $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
         $bench_func.iter(|| {
             let prizes = Vec::from_iter(
                 (0..$nr_prize).map(|x| PrizeBuilder::new().count($nr_per_prize).name(format!("{x}")).build()),
@@ -86,7 +80,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -97,7 +92,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
@@ -115,7 +111,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -126,7 +123,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
@@ -144,7 +142,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -155,7 +154,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
@@ -173,7 +173,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -184,7 +185,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
@@ -202,7 +204,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -213,7 +216,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
@@ -231,7 +235,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = CsPrng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -242,7 +247,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = CsPrng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
@@ -260,7 +266,8 @@ pub fn bench(c: &mut Criterion) {
             .warm_up_time(warm(time_coeff));
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(array
+            bench_iter_multiple!(
+                shuffle_array,
                 b,
                 rng,
                 nr_prize,
@@ -271,7 +278,8 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
+            bench_iter_multiple!(
+                shuffle_tree,
                 b,
                 rng,
                 nr_prize,
