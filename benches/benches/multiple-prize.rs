@@ -11,7 +11,7 @@ static ALLOCATOR: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 criterion_group!(
     name = benches;
-    config = Criterion::default();
+    config = Criterion::default().noise_threshold(0.03);
     targets = bench
 );
 criterion_main!(benches);
@@ -54,10 +54,10 @@ pub fn bench(c: &mut Criterion) {
     const NUM_ENTRANTS: usize = 65536;
     const FACTOR: usize = 3;
     const TIME_MEASUREMENT_BASE: Duration = Duration::from_secs(10);
-    const WARM_UP_COEFF: u32 = 10;
+    const WARM_UP_COEFF: u32 = 5;
     {
         let mut g = c.benchmark_group("multiple_large_t_large_p");
-        let time_coeff = 18;
+        let time_coeff = 9;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
@@ -88,7 +88,7 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_large_t_medium_p");
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = NUM_ENTRANTS;
-        let time_coeff = 9;
+        let time_coeff = 2;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
@@ -117,7 +117,7 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_large_t_small_p");
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
-        let time_coeff = 3;
+        let time_coeff = 1;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
@@ -146,7 +146,7 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_large_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
-        let time_coeff = 6;
+        let time_coeff = 4;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
@@ -175,7 +175,7 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_medium_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS;
-        let time_coeff = 3;
+        let time_coeff = 1;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
@@ -204,7 +204,7 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_medium_p_std_rng");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS;
-        let time_coeff = 3;
+        let time_coeff = 1;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
@@ -233,7 +233,7 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_small_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
-        let time_coeff = 3;
+        let time_coeff = 1;
         g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
             .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
