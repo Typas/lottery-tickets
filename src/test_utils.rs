@@ -1,5 +1,5 @@
-use crate::prize::Prize;
 use crate::entrant::Entrant;
+use crate::prize::Prize;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -19,7 +19,6 @@ impl<'p> Entrant<'p> for GenericEntrant<'p> {
     fn add_prize(&mut self, prize: &'p crate::prize::Prize) -> bool {
         if self.tickets_count > 0 {
             self.prizes.push(prize);
-            self.tickets_count -= 1;
             self.log.borrow_mut().push(prize);
             true
         } else {
@@ -79,7 +78,6 @@ impl<'p> Entrant<'p> for CapacityOneEntrant<'p> {
     fn add_prize(&mut self, prize: &'p crate::prize::Prize) -> bool {
         if self.tickets_count > 0 && self.prize.is_none() {
             self.prize = Some(prize);
-            self.tickets_count -= 1;
             self.log.borrow_mut().push(prize);
             true
         } else {

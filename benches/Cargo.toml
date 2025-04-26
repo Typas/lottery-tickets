@@ -1,0 +1,21 @@
+[package]
+name = "benches"
+version = "0.0.0"
+authors = [ "Typas Liao <typascake@gmail.com>" ]
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+lottery-tickets = { path = ".." }
+criterion = "0.5"
+rand = "0.9"
+rand_xoshiro = "0.7"
+rand_chacha = "0.9"
+
+[[bench]]
+name = "single-prize"
+harness = false
+
+[[bench]]
+name = "multiple-prize"
+harness = false
