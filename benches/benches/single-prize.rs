@@ -6,6 +6,9 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng as CsPrng;
 use rand_xoshiro::Xoshiro256PlusPlus as Prng;
 
+#[global_allocator]
+static ALLOCATOR: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 criterion_group!(
     name = benches;
     config = Criterion::default();
