@@ -50,9 +50,13 @@ pub fn bench(c: &mut Criterion) {
     // Rng would be either SmallRng (default) or StdRng
     const NUM_ENTRANTS: usize = 65536;
     const FACTOR: usize = 3;
+    const TIME_MEASUREMENT_BASE: Duration = Duration::from_secs(10);
+    const WARM_UP_COEFF: u32 = 10;
     {
         let mut g = c.benchmark_group("multiple_large_t_large_p");
-        g.measurement_time(Duration::from_secs(180));
+        let time_coeff = 18;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         g.bench_function("array", |b| {
@@ -81,7 +85,9 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_large_t_medium_p");
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = NUM_ENTRANTS;
-        g.measurement_time(Duration::from_secs(90));
+        let time_coeff = 9;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
             bench_iter_multiple!(array
@@ -108,7 +114,9 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_large_t_small_p");
         let nr_ticket = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
-        g.measurement_time(Duration::from_secs(30));
+        let time_coeff = 3;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
             bench_iter_multiple!(array
@@ -135,7 +143,9 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_large_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize;
-        g.measurement_time(Duration::from_secs(90));
+        let time_coeff = 6;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
             bench_iter_multiple!(array
@@ -162,7 +172,9 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_medium_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS;
-        g.measurement_time(Duration::from_secs(30));
+        let time_coeff = 3;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
             bench_iter_multiple!(array
@@ -189,7 +201,9 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_medium_p_std_rng");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS;
-        g.measurement_time(Duration::from_secs(30));
+        let time_coeff = 3;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
             let mut rng = CsPrng::seed_from_u64(1);
             bench_iter_multiple!(array
@@ -216,7 +230,9 @@ pub fn bench(c: &mut Criterion) {
         let mut g = c.benchmark_group("multiple_medium_t_small_p");
         let nr_ticket = NUM_ENTRANTS;
         let nr_prize = NUM_ENTRANTS.ilog2() as usize;
-        g.measurement_time(Duration::from_secs(30));
+        let time_coeff = 3;
+        g.measurement_time(time_coeff * TIME_MEASUREMENT_BASE)
+            .warm_up_time(time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF);
         g.bench_function("array", |b| {
             let mut rng = Prng::seed_from_u64(1);
             bench_iter_multiple!(array
@@ -230,33 +246,6 @@ pub fn bench(c: &mut Criterion) {
 
         g.bench_function("tree", |b| {
             let mut rng = Prng::seed_from_u64(1);
-            bench_iter_multiple!(tree
-                b,
-                rng,
-                nr_prize,
-                1.max(nr_prize / NUM_ENTRANTS),
-                1.max(nr_ticket / NUM_ENTRANTS)
-            );
-        });
-    }
-    {
-        let mut g = c.benchmark_group("multiple_medium_t_small_p_std_rng");
-        let nr_ticket = NUM_ENTRANTS;
-        let nr_prize = NUM_ENTRANTS.ilog2() as usize;
-        g.measurement_time(Duration::from_secs(30));
-        g.bench_function("array", |b| {
-            let mut rng = CsPrng::seed_from_u64(1);
-            bench_iter_multiple!(array
-                b,
-                rng,
-                nr_prize,
-                1.max(nr_prize / NUM_ENTRANTS),
-                1.max(nr_ticket / NUM_ENTRANTS)
-            );
-        });
-
-        g.bench_function("tree", |b| {
-            let mut rng = CsPrng::seed_from_u64(1);
             bench_iter_multiple!(tree
                 b,
                 rng,
