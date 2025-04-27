@@ -49,33 +49,34 @@ const FACTOR: usize = 3;
 const TIME_MEASUREMENT_BASE: Duration = Duration::from_secs(10);
 const WARM_UP_COEFF: u32 = 5;
 
+// `large` would be k * n * log2(n), where k is `FACTOR`
+// `medium` would be k * n
+// `small` would be k * log2(n)
 const fn large() -> usize {
     FACTOR * NUM_ENTRANTS * NUM_ENTRANTS.ilog2() as usize
 }
-
 const fn medium() -> usize {
     FACTOR * NUM_ENTRANTS
 }
-
 const fn small() -> usize {
     FACTOR * NUM_ENTRANTS.ilog2() as usize
 }
 
+// least time needed for measuring 100 samples
 fn measure(time_coeff: u32) -> Duration {
     time_coeff * TIME_MEASUREMENT_BASE
 }
 
+// the warmup would take at least 20 cycles
+// for at least 100 samples, the coeff is 100/20 = 5
 fn warm(time_coeff: u32) -> Duration {
     time_coeff * TIME_MEASUREMENT_BASE / WARM_UP_COEFF
 }
 
 pub fn bench(c: &mut Criterion) {
     // bench function naming rule
-    // [number of tickets_t]_[number of prizes_p]_[Rng]
-    // `large` would be ku log2(u), where k is `FACTOR`
-    // `medium` would be u
-    // `small` would be log2(u)
-    // Rng would be either SmallRng (default) or StdRng
+    // multiple_[number of tickets_t]_[number of prizes_p]_[Rng]
+    // Rng would be either Prng (default) or CsPrng
     {
         let mut g = c.benchmark_group("multiple_large_t_large_p");
         let nr_ticket = large();
@@ -222,7 +223,7 @@ pub fn bench(c: &mut Criterion) {
         });
     }
     {
-        let mut g = c.benchmark_group("multiple_medium_t_medium_p_std_rng");
+        let mut g = c.benchmark_group("multiple_medium_t_medium_p_csprng");
         let nr_ticket = medium();
         let nr_prize = medium();
         let time_coeff = 1;
