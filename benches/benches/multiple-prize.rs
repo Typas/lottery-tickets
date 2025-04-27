@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use gxhash::GxBuildHasher;
 use lottery_tickets::{entrant::EntrantBuilder, lottery::Lottery, prize::PrizeBuilder};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng as CsPrng;
@@ -13,7 +12,14 @@ static ALLOCATOR: jemallocator::Jemalloc = jemallocator::Jemalloc;
 criterion_group!(
     name = benches;
     config = Criterion::default().noise_threshold(0.03);
-    targets = multiple_large_t_large_p, multiple_large_t_medium_p, multiple_large_t_small_p, multiple_medium_t_large_p, multiple_medium_t_medium_p, multiple_medium_t_medium_p_csprng, multiple_medium_t_small_p
+    targets =
+        multiple_large_t_large_p,
+        multiple_large_t_medium_p,
+        multiple_large_t_small_p,
+        multiple_medium_t_large_p,
+        multiple_medium_t_medium_p,
+        multiple_medium_t_medium_p_csprng,
+        multiple_medium_t_small_p
 );
 criterion_main!(benches);
 
@@ -37,7 +43,7 @@ macro_rules! bench_iter_multiple {
                         .build_multiple()
                 })
                 .collect::<Vec<_>>();
-            let mut lottery = Lottery::with_hasher(GxBuildHasher::with_seed(2));
+            let mut lottery = Lottery::with_hasher(gxhash::GxBuildHasher::with_seed(2));
             lottery.set_entrants(entrants);
             lottery.set_prizes(prizes);
             lottery.$shuffle_func(&mut $rng);
