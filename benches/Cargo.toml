@@ -12,6 +12,10 @@ rand = "0.9"
 rand_xoshiro = "0.7"
 rand_chacha = "0.9"
 jemallocator = "0.5"
+gxhash = "2.3"
+
+[profile.bench]
+debug = true
 
 [[bench]]
 name = "single-prize"
