@@ -17,6 +17,11 @@ gxhash = "2.3"
 [profile.bench]
 debug = true
 
+[features]
+default = ["array", "tree"]
+array = []
+tree = []
+
 [[bench]]
 name = "single-prize"
 harness = false
