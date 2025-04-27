@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use gxhash::GxHasher;
+use gxhash::GxBuildHasher;
 use lottery_tickets::{entrant::EntrantBuilder, lottery::Lottery, prize::PrizeBuilder};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng as CsPrng;
@@ -37,7 +37,7 @@ macro_rules! bench_iter_multiple {
                         .build_multiple()
                 })
                 .collect::<Vec<_>>();
-            let mut lottery = Lottery::with_hasher(GxHasher::default());
+            let mut lottery = Lottery::with_hasher(GxBuildHasher::with_seed(2));
             lottery.set_entrants(entrants);
             lottery.set_prizes(prizes);
             lottery.$shuffle_func(&mut $rng);
