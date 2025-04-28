@@ -1,5 +1,3 @@
 //! TODO: move MultiPrizeUser to here.
 
-fn main() {
-
-}
+fn main() {}
