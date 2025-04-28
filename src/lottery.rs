@@ -1,13 +1,13 @@
-use std::{
-    collections::HashMap,
-    hash::{Hash, RandomState},
-    iter::repeat_n,
-    marker::PhantomData,
-};
+use std::collections::HashMap;
+use std::hash::{Hash, RandomState};
+use std::iter::repeat_n;
+use std::marker::PhantomData;
 
 use rand::Rng;
 
-use crate::{entrant::Entrant, prize::Prize, space_efficient_shuffler};
+use crate::entrant::Entrant;
+use crate::prize::Prize;
+use crate::space_efficient_shuffler;
 pub struct Lottery<'entrant, K, U, S = RandomState>
 where
     K: Hash + Eq,
@@ -113,7 +113,8 @@ where
     }
 
     /// Set the whole prizes of the lottery.
-    /// The prize in position 0 would be the biggest prize, while the last prize would be the smallest prize.
+    /// The prize in position 0 would be the biggest prize, while the last prize would be the
+    /// smallest prize.
     pub fn set_prizes<C>(&mut self, prizes: C)
     where
         C: IntoIterator<Item = Prize>,

@@ -1,9 +1,8 @@
-use std::{
-    iter::{Peekable, repeat},
-    num::NonZeroUsize,
-};
+use std::iter::{Peekable, repeat};
+use std::num::NonZeroUsize;
 
-use crate::{entrant::Entrant, prize::Prize};
+use crate::entrant::Entrant;
+use crate::prize::Prize;
 use rand::Rng;
 pub(crate) struct SpaceEfficientShuffler<'e, E> {
     /// A tree where being leaf iff `BinaryTreeNode::Leaf`, i.e. concrete entrant.
@@ -18,8 +17,8 @@ pub(crate) struct SpaceEfficientShuffler<'e, E> {
 
 #[derive(Debug)]
 enum BinaryTreeNode<'e, E> {
-    /// Either initialization stub, or `Leaf` just got purged after `SpaceEfficientShuffler::draw_one`.
-    /// See also `SpaceEfficientShuffler::trim`.
+    /// Either initialization stub, or `Leaf` just got purged after
+    /// `SpaceEfficientShuffler::draw_one`. See also `SpaceEfficientShuffler::trim`.
     /// A transient state: no valid node would be such that both its children are `None`.
     None,
     /// Artifact of both `SpaceEfficientShuffler::draw_one` and `SpaceEfficientShuffler::trim`:
@@ -142,8 +141,8 @@ where
 
     /// Each node is either one entrant or a set of entrants, as determined by `BinaryTreeNode`.
     ///
-    /// Drawing a lucky entrant is done via traversing down the tree via sequence of binary questions,
-    /// based on left/right tickets count,
+    /// Drawing a lucky entrant is done via traversing down the tree via sequence of binary
+    /// questions, based on left/right tickets count,
     /// till a node that is exactly one entrant is found.
     ///
     /// During the walk till the lucky entrant, we may find `BinaryTreeNode::One`,
@@ -159,8 +158,8 @@ where
     /// in which case we should retry from root.
     ///
     /// Return:
-    /// `false` if no more lottery can be drawn, either because of no remaining entrants or no remaining prizes;
-    /// `true` if successfully picked the lucky entrant.
+    /// `false` if no more lottery can be drawn, either because of no remaining entrants or no
+    /// remaining prizes; `true` if successfully picked the lucky entrant.
     ///
     /// TODO
     /// implement entropy pool, maybe as simple as caching random numbers.
