@@ -16,12 +16,12 @@ criterion_group!(
     name = benches;
     config = Criterion::default().noise_threshold(0.03);
     targets =
-        // multiple_large_t_large_p,
-        // multiple_large_t_medium_p,
-        // multiple_large_t_small_p,
-        // multiple_medium_t_large_p,
-        // multiple_medium_t_medium_p,
-        // multiple_medium_t_medium_p_csprng,
+        multiple_large_t_large_p,
+        multiple_large_t_medium_p,
+        multiple_large_t_small_p,
+        multiple_medium_t_large_p,
+        multiple_medium_t_medium_p,
+        multiple_medium_t_medium_p_csprng,
         multiple_medium_t_small_p
 );
 criterion_main!(benches);
