@@ -24,13 +24,7 @@ criterion_group!(
 criterion_main!(benches);
 
 macro_rules! bench_iter_single {
-    (array $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
-        bench_iter_single!(@inner $bench_func, $rng, shuffle_array, $nr_prize, $nr_per_prize, $ticket_per_user)
-    };
-    (tree $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
-        bench_iter_single!(@inner $bench_func, $rng, shuffle_tree, $nr_prize, $nr_per_prize, $ticket_per_user)
-    };
-    (@inner $bench_func: ident, $rng: ident, $shuffle_func: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
+    ($shuffle_func: ident, $bench_func: ident, $rng: ident, $nr_prize: ident, $nr_per_prize: expr, $ticket_per_user: expr) => {
         $bench_func.iter(|| {
             let prizes = Vec::from_iter(
                 (0..$nr_prize).map(|x| PrizeBuilder::new().count($nr_per_prize).name(format!("{x}")).build()),
@@ -92,24 +86,26 @@ pub fn single_large_t_large_p(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(array
-                             b,
-                             rng,
-                             nr_prize,
-                             1.max(nr_prize / NUM_ENTRANTS),
-                             1.max(nr_ticket / NUM_ENTRANTS)
+        bench_iter_single!(
+            shuffle_array,
+            b,
+            rng,
+            nr_prize,
+            1.max(nr_prize / NUM_ENTRANTS),
+            1.max(nr_ticket / NUM_ENTRANTS)
         );
     });
 
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(tree
-                             b,
-                             rng,
-                             nr_prize,
-                             1.max(nr_prize / NUM_ENTRANTS),
-                             1.max(nr_ticket / NUM_ENTRANTS)
+        bench_iter_single!(
+            shuffle_tree,
+            b,
+            rng,
+            nr_prize,
+            1.max(nr_prize / NUM_ENTRANTS),
+            1.max(nr_ticket / NUM_ENTRANTS)
         );
     });
 }
@@ -123,7 +119,8 @@ pub fn single_large_t_medium_p(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(array
+        bench_iter_single!(
+            shuffle_array,
             b,
             rng,
             nr_prize,
@@ -135,7 +132,8 @@ pub fn single_large_t_medium_p(c: &mut Criterion) {
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(tree
+        bench_iter_single!(
+            shuffle_tree,
             b,
             rng,
             nr_prize,
@@ -154,7 +152,8 @@ pub fn single_large_t_small_p(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(array
+        bench_iter_single!(
+            shuffle_array,
             b,
             rng,
             nr_prize,
@@ -166,7 +165,8 @@ pub fn single_large_t_small_p(c: &mut Criterion) {
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(tree
+        bench_iter_single!(
+            shuffle_tree,
             b,
             rng,
             nr_prize,
@@ -185,7 +185,8 @@ pub fn single_medium_t_large_p(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(array
+        bench_iter_single!(
+            shuffle_array,
             b,
             rng,
             nr_prize,
@@ -197,7 +198,8 @@ pub fn single_medium_t_large_p(c: &mut Criterion) {
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(tree
+        bench_iter_single!(
+            shuffle_tree,
             b,
             rng,
             nr_prize,
@@ -216,7 +218,8 @@ pub fn single_medium_t_medium_p(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(array
+        bench_iter_single!(
+            shuffle_array,
             b,
             rng,
             nr_prize,
@@ -228,7 +231,8 @@ pub fn single_medium_t_medium_p(c: &mut Criterion) {
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(tree
+        bench_iter_single!(
+            shuffle_tree,
             b,
             rng,
             nr_prize,
@@ -247,7 +251,8 @@ pub fn single_medium_t_medium_p_csprng(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = CsPrng::seed_from_u64(1);
-        bench_iter_single!(array
+        bench_iter_single!(
+            shuffle_array,
             b,
             rng,
             nr_prize,
@@ -259,7 +264,8 @@ pub fn single_medium_t_medium_p_csprng(c: &mut Criterion) {
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = CsPrng::seed_from_u64(1);
-        bench_iter_single!(tree
+        bench_iter_single!(
+            shuffle_tree,
             b,
             rng,
             nr_prize,
@@ -278,7 +284,8 @@ pub fn single_medium_t_small_p(c: &mut Criterion) {
     #[cfg(feature = "array")]
     g.bench_function("array", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(array
+        bench_iter_single!(
+            shuffle_array,
             b,
             rng,
             nr_prize,
@@ -290,7 +297,8 @@ pub fn single_medium_t_small_p(c: &mut Criterion) {
     #[cfg(feature = "tree")]
     g.bench_function("tree", |b| {
         let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(tree
+        bench_iter_single!(
+            shuffle_tree,
             b,
             rng,
             nr_prize,
