@@ -11,8 +11,12 @@ criterion = "0.5"
 rand = "0.9"
 rand_xoshiro = "0.7"
 rand_chacha = "0.9"
-jemallocator = "0.5"
 gxhash = "3.5"
+jemalloc-ctl = "0.5"
+
+[dev-dependencies.jemallocator]
+version = "0.5"
+features = ["stats", "profiling", "unprefixed_malloc_on_supported_platforms"]
 
 [profile.bench]
 debug = true

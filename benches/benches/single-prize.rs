@@ -1,6 +1,9 @@
+mod util;
 use std::time::Duration;
 
+use crate::util::memory_usage_output;
 use criterion::{Criterion, criterion_group, criterion_main};
+use jemalloc_ctl::{epoch, stats};
 use lottery_tickets::{entrant::EntrantBuilder, lottery::Lottery, prize::PrizeBuilder};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng as CsPrng;
@@ -44,7 +47,6 @@ macro_rules! bench_iter_single {
         });
     };
 }
-
 const NUM_ENTRANTS: usize = 65536;
 const FACTOR: usize = 3;
 const TIME_MEASUREMENT_BASE: Duration = Duration::from_secs(10);
@@ -282,28 +284,52 @@ pub fn single_medium_t_small_p(c: &mut Criterion) {
     let time_coeff = 1;
     g.measurement_time(measure(time_coeff)).warm_up_time(warm(time_coeff));
     #[cfg(feature = "array")]
-    g.bench_function("array", |b| {
-        let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(
-            shuffle_array,
-            b,
-            rng,
-            nr_prize,
-            1.max(nr_prize / NUM_ENTRANTS),
-            1.max(nr_ticket / NUM_ENTRANTS)
-        );
-    });
+    {
+        let e = epoch::mib().unwrap();
+        let allocated = stats::allocated::mib().unwrap();
+        let resident = stats::resident::mib().unwrap();
+        let mut allocates: Vec<usize> = Vec::with_capacity(4096);
+        let mut residents: Vec<usize> = Vec::with_capacity(4096);
+        g.bench_function("array", |b| {
+            let mut rng = Prng::seed_from_u64(1);
+            bench_iter_single!(
+                shuffle_array,
+                b,
+                rng,
+                nr_prize,
+                1.max(nr_prize / NUM_ENTRANTS),
+                1.max(nr_ticket / NUM_ENTRANTS)
+            );
+            e.advance().unwrap();
+            allocates.push(allocated.read().unwrap());
+            residents.push(resident.read().unwrap());
+        });
+        memory_usage_output(allocates, "allocated");
+        memory_usage_output(residents, "resident");
+    }
 
     #[cfg(feature = "tree")]
-    g.bench_function("tree", |b| {
-        let mut rng = Prng::seed_from_u64(1);
-        bench_iter_single!(
-            shuffle_tree,
-            b,
-            rng,
-            nr_prize,
-            1.max(nr_prize / NUM_ENTRANTS),
-            1.max(nr_ticket / NUM_ENTRANTS)
-        );
-    });
+    {
+        let e = epoch::mib().unwrap();
+        let allocated = stats::allocated::mib().unwrap();
+        let resident = stats::resident::mib().unwrap();
+        let mut allocates: Vec<usize> = Vec::with_capacity(4096);
+        let mut residents: Vec<usize> = Vec::with_capacity(4096);
+        g.bench_function("tree", |b| {
+            let mut rng = Prng::seed_from_u64(1);
+            bench_iter_single!(
+                shuffle_tree,
+                b,
+                rng,
+                nr_prize,
+                1.max(nr_prize / NUM_ENTRANTS),
+                1.max(nr_ticket / NUM_ENTRANTS)
+            );
+            e.advance().unwrap();
+            allocates.push(allocated.read().unwrap());
+            residents.push(resident.read().unwrap());
+        });
+        memory_usage_output(allocates, "allocated");
+        memory_usage_output(residents, "resident");
+    }
 }
