@@ -23,9 +23,9 @@ fn format_bytes(bytes: usize) -> String {
         (2usize.checked_pow(60), "EB"),
     ];
 
-    for unit in BYTEUNITS.iter().rev() {
-        if unit.0.is_some_and(|b| b < bytes) {
-            return format!("{:.2} {}", bytes as f64 / unit.0.unwrap() as f64, unit.1);
+    for (unit, name) in BYTEUNITS.iter().rev() {
+        if unit.is_some_and(|b| b < bytes) {
+            return format!("{:.2} {}", bytes as f64 / unit.unwrap() as f64, name);
         }
     }
     format!("{} Bytes", bytes)
