@@ -108,8 +108,8 @@ pub fn single_large_t_large_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -133,8 +133,8 @@ pub fn single_large_t_large_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }
 
@@ -165,8 +165,8 @@ pub fn single_large_t_medium_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -190,8 +190,8 @@ pub fn single_large_t_medium_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }
 
@@ -222,8 +222,8 @@ pub fn single_large_t_small_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -247,8 +247,8 @@ pub fn single_large_t_small_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }
 
@@ -279,8 +279,8 @@ pub fn single_medium_t_large_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -304,8 +304,8 @@ pub fn single_medium_t_large_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }
 
@@ -336,8 +336,8 @@ pub fn single_medium_t_medium_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -361,8 +361,8 @@ pub fn single_medium_t_medium_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }
 
@@ -393,8 +393,8 @@ pub fn single_medium_t_medium_p_csprng(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -418,8 +418,8 @@ pub fn single_medium_t_medium_p_csprng(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }
 
@@ -450,8 +450,8 @@ pub fn single_medium_t_small_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 
     #[cfg(feature = "tree")]
@@ -475,7 +475,7 @@ pub fn single_medium_t_small_p(c: &mut Criterion) {
                 residents.push(resident.read().unwrap())
             );
         });
-        memory_usage_output(actives, "active");
-        memory_usage_output(residents, "resident");
+        memory_usage_output(&actives, "active");
+        memory_usage_output(&residents, "resident");
     }
 }

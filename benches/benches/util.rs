@@ -1,5 +1,5 @@
 // Print the result of memory usages
-pub fn memory_usage_output(v: Vec<usize>, s: &str) {
+pub fn memory_usage_output(v: &[usize], s: &str) {
     let min = v.iter().min().unwrap();
     let avg = v.iter().sum::<usize>() / v.len();
     let max = v.iter().max().unwrap();
