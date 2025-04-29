@@ -14,25 +14,19 @@ pub fn memory_usage_output(v: &[usize], s: &str) {
 
 // format the bytes to human-readable strings
 fn format_bytes(bytes: usize) -> String {
-    const KB: usize = 2usize.pow(10);
-    const MB: usize = 2usize.pow(20);
-    const GB: usize = 2usize.pow(30);
+    const BYTEUNITS: [(Option<usize>, &str); 6] = [
+        (2usize.checked_pow(10), "KB"),
+        (2usize.checked_pow(20), "MB"),
+        (2usize.checked_pow(30), "GB"),
+        (2usize.checked_pow(40), "TB"),
+        (2usize.checked_pow(50), "PB"),
+        (2usize.checked_pow(60), "EB"),
+    ];
 
-    if bytes < KB {
-        format!("{} Bytes", bytes)
-    } else if bytes < MB {
-        format!("{:.2} KB", bytes as f64 / KB as f64)
-    } else if bytes < GB {
-        format!("{:.2} MB", bytes as f64 / MB as f64)
-    } else if u32::MAX as usize == usize::MAX {
-        format!("{:.2} GB", bytes as f64 / GB as f64)
-    } else if bytes < 2usize.pow(40) {
-        format!("{:.2} GB", bytes as f64 / GB as f64)
-    } else if bytes < 2usize.pow(50) {
-        format!("{:.2} TB", bytes as f64 / 2usize.pow(40) as f64)
-    } else if bytes < 2usize.pow(60) {
-        format!("{:.2} PB", bytes as f64 / 2usize.pow(50) as f64)
-    } else {
-        format!("{:.2} EB", bytes as f64 / 2usize.pow(60) as f64)
+    for unit in BYTEUNITS.iter().rev() {
+        if unit.0.is_some_and(|b| b < bytes) {
+            return format!("{:.2} {}", bytes as f64 / unit.0.unwrap() as f64, unit.1);
+        }
     }
+    format!("{} Bytes", bytes)
 }
