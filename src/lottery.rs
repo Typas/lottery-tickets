@@ -193,6 +193,8 @@ where
         }
 
         let keys = self.entrants.values().map(Entrant::key).collect::<Vec<_>>();
+        let mut keymaps = keys.iter().map(|k| (k, false)).collect::<HashMap<&K, bool, S>>();
+        let mut num_fulfilled_entrant = 0;
         // Shuffle the slots, each entrant has `entrant.ticket_count()` slots.
         // Use the entrant's key to point back to itself.
         // The complexity shuffling would be both O(n).
@@ -232,6 +234,18 @@ where
                 // Fortunately, this is not recursive, and relative simple to check the boundary.
                 if self.entrants.get_mut(&ticket).unwrap().add_prize(prize) {
                     break;
+                } else {
+                    let is_fulfilled = *keymaps.get(&ticket).unwrap();
+                    if !is_fulfilled {
+                        *keymaps.get_mut(&ticket).unwrap() = true;
+                        num_fulfilled_entrant += 1;
+                    }
+                    if num_fulfilled_entrant == self.entrants.len() {
+                        // when all the entrants are fulfilled (none of them can add prize),
+                        // it is good to early return.
+                        self.shuffled = true;
+                        return;
+                    }
                 }
             }
         }
