@@ -193,7 +193,7 @@ where
         }
 
         let keys = self.entrants.values().map(Entrant::key).collect::<Vec<_>>();
-        let mut keymaps = keys.iter().map(|k| (k, false)).collect::<HashMap<&K, bool, S>>();
+        let mut fulfillmap = keys.iter().map(|k| (k, false)).collect::<HashMap<&K, bool, S>>();
         let mut num_fulfilled_entrant = 0;
         // Shuffle the slots, each entrant has `entrant.ticket_count()` slots.
         // Use the entrant's key to point back to itself.
@@ -232,12 +232,12 @@ where
                 // It is possible to use raw pointer to reduce both key production and hashing costs.
                 // However, it requires unsafe.
                 // Fortunately, this is not recursive, and relative simple to check the boundary.
-                if self.entrants.get_mut(&ticket).unwrap().add_prize(prize) {
-                    break;
-                } else {
-                    let is_fulfilled = *keymaps.get(&ticket).unwrap();
-                    if !is_fulfilled {
-                        *keymaps.get_mut(&ticket).unwrap() = true;
+                if !*fulfillmap.get(&ticket).unwrap() {
+                    // only possible when the entrant is not fulfilled
+                    if self.entrants.get_mut(&ticket).unwrap().add_prize(prize) {
+                        break;
+                    } else {
+                        *fulfillmap.get_mut(&ticket).unwrap() = true;
                         num_fulfilled_entrant += 1;
                         if num_fulfilled_entrant == self.entrants.len() {
                             // when all the entrants are fulfilled (none of them can add prize),
