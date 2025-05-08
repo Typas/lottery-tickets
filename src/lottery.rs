@@ -239,12 +239,12 @@ where
                     if !is_fulfilled {
                         *keymaps.get_mut(&ticket).unwrap() = true;
                         num_fulfilled_entrant += 1;
-                    }
-                    if num_fulfilled_entrant == self.entrants.len() {
-                        // when all the entrants are fulfilled (none of them can add prize),
-                        // it is good to early return.
-                        self.shuffled = true;
-                        return;
+                        if num_fulfilled_entrant == self.entrants.len() {
+                            // when all the entrants are fulfilled (none of them can add prize),
+                            // it is good to early return.
+                            self.shuffled = true;
+                            return;
+                        }
                     }
                 }
             }
