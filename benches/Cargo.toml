@@ -20,6 +20,7 @@ features = ["stats", "profiling", "unprefixed_malloc_on_supported_platforms"]
 
 [profile.bench]
 debug = true
+opt-level = 2
 
 [features]
 default = ["array", "tree"]
