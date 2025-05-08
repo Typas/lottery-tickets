@@ -1,3 +1,22 @@
 target/
 Cargo.lock
 .*.swp
+
+# temporary files
+*~
+\#*#
+.DS_Store
+.idea
+*.log
+tmp/
+
+# backup
+*.bak
+
+# universal tags
+.tags/
+.tags
+
+# flamegraph
+perf.data*
+*.svg
