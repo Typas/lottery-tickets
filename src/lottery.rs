@@ -1,17 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, RandomState};
 use std::iter::repeat_n;
-use std::marker::PhantomData;
 
 use rand::Rng;
 
 use crate::entrant::Entrant;
 use crate::prize::Prize;
 use crate::space_efficient_shuffler;
-pub struct Lottery<'entrant, K, U, S = RandomState>
+pub struct Lottery<K, U, S = RandomState>
 where
     K: Hash + Eq,
-    U: Entrant<'entrant, Key = K>,
 {
     /// Determine whether the lottery has been shuffled and done.
     shuffled: bool,
@@ -19,15 +17,9 @@ where
     entrants: HashMap<K, U, S>,
     /// The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
-    /// The lifetime is actually refering to those `impl Entrant` in the map,
-    /// which in turn is referring to `Prize` in this exact struct (`Self::prizes`)
-    ///
-    /// Rust complains if not explicitly used in any of the fields,
-    /// thus the marker.
-    _marker: PhantomData<&'entrant U>,
 }
 
-impl<'u, K, U> Default for Lottery<'u, K, U>
+impl<'u, K, U> Default for Lottery<K, U>
 where
     K: Hash + Eq,
     U: Entrant<'u, Key = K>,
@@ -37,7 +29,7 @@ where
     }
 }
 
-impl<'u, K, U> Lottery<'u, K, U>
+impl<'u, K, U> Lottery<K, U>
 where
     K: Hash + Eq,
     U: Entrant<'u, Key = K>,
@@ -47,7 +39,6 @@ where
             entrants: HashMap::new(),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -56,12 +47,11 @@ where
             entrants: HashMap::with_capacity(cap),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 }
 
-impl<'u, K, U, S> Lottery<'u, K, U, S>
+impl<'u, K, U, S> Lottery<K, U, S>
 where
     K: Hash + Eq,
     U: Entrant<'u, Key = K>,
@@ -72,7 +62,6 @@ where
             entrants: HashMap::with_capacity_and_hasher(cap, hasher),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -81,7 +70,6 @@ where
             entrants: HashMap::with_hasher(hasher),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -132,11 +120,16 @@ where
     pub fn entrants_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, U> {
         self.entrants.values_mut()
     }
+}
 
-    pub fn shuffle<'myself>(&'myself mut self, rng: &mut impl Rng)
-    where
-        'myself: 'u,
-    {
+impl<'entrant, 'prize, K, U, S> Lottery<K, U, S>
+where
+    K: Hash + Eq,
+    U: Entrant<'entrant, Key = K>,
+    S: std::hash::BuildHasher + std::default::Default,
+    'prize: 'entrant,
+{
+    pub fn shuffle(&'prize mut self, rng: &mut impl Rng) {
         // FIXME: this is just a guess.
         // Let `u` be the number of entrants, `t` be the number of tickets, `p` be the number of prizes.
         // Assuming the size of "tree" would require 24 * 2 * u * log(u),
@@ -153,10 +146,7 @@ where
         }
     }
 
-    pub fn shuffle_tree<'myself>(&'myself mut self, rng: &mut impl Rng)
-    where
-        'myself: 'u,
-    {
+    pub fn shuffle_tree(&'prize mut self, rng: &mut impl Rng) {
         if self.shuffled {
             return;
         }
@@ -171,20 +161,18 @@ where
         while space_efficient_shuffler.try_draw_one(rng, &mut prizes) {}
     }
 
-    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R)
+    pub fn shuffle_array<R>(&'prize mut self, rng: &mut R)
     where
         R: Rng,
-        'myself: 'u,
     {
         let total_ticket_count: usize = self.entrants.values().map(|u| u.ticket_count()).sum();
         self.shuffle_array_inner(rng, total_ticket_count);
     }
 
     /// Shuffle the slots and distribute the prizes to the entrants.
-    fn shuffle_array_inner<'myself, R>(&'myself mut self, rng: &mut R, num_tickets: usize)
+    fn shuffle_array_inner<R>(&'prize mut self, rng: &mut R, num_tickets: usize)
     where
         R: Rng,
-        'myself: 'u,
     {
         use std::iter::repeat_n;
         // Shuffle twice would cause double spend.
@@ -193,8 +181,7 @@ where
         }
 
         let keys = self.entrants.values().map(Entrant::key).collect::<Vec<_>>();
-        let mut fulfillmap = keys.iter().map(|k| (k, false)).collect::<HashMap<&K, bool, S>>();
-        let mut num_fulfilled_entrant = 0;
+        let mut yet_fulfilled = keys.iter().collect::<HashSet<&K, S>>();
         // Shuffle the slots, each entrant has `entrant.ticket_count()` slots.
         // Use the entrant's key to point back to itself.
         // The complexity shuffling would be both O(n).
@@ -227,23 +214,22 @@ where
         // p2 -> u7
         let prizes = self.prizes.iter().flat_map(|p| repeat_n(p, p.count()));
         let mut tickets = tickets_god_only_knows_which_entrant.into_iter();
-        for prize in prizes {
+        'outer: for prize in prizes {
             for ticket in tickets.by_ref() {
                 // It is possible to use raw pointer to reduce both key production and hashing costs.
                 // However, it requires unsafe.
                 // Fortunately, this is not recursive, and relative simple to check the boundary.
-                if !*fulfillmap.get(&ticket).unwrap() {
-                    // only possible when the entrant is not fulfilled
-                    if self.entrants.get_mut(&ticket).unwrap().add_prize(prize) {
+                if yet_fulfilled.contains(ticket) {
+                    if self.entrants.get_mut(ticket).unwrap().add_prize(prize) {
+                        // entrant may accept more prizes, no-op
                         break;
                     } else {
-                        *fulfillmap.get_mut(&ticket).unwrap() = true;
-                        num_fulfilled_entrant += 1;
-                        if num_fulfilled_entrant == self.entrants.len() {
+                        // entrant accepts prizes no more, purge it
+                        yet_fulfilled.remove(ticket);
+                        if yet_fulfilled.is_empty() {
                             // when all the entrants are fulfilled (none of them can add prize),
                             // it is good to early return.
-                            self.shuffled = true;
-                            return;
+                            break 'outer;
                         }
                     }
                 }
