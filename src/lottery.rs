@@ -129,6 +129,7 @@ where
     S: std::hash::BuildHasher + std::default::Default,
     'prize: 'entrant,
 {
+    /// Shuffle and distribute the prizes to the entrants.
     pub fn shuffle(&'prize mut self, rng: &mut impl Rng) {
         // FIXME: this is just a guess.
         // Let `u` be the number of entrants, `t` be the number of tickets, `p` be the number of prizes.
@@ -140,12 +141,13 @@ where
         let tree_est = 3 * self.entrants.len() * self.entrants.len().ilog2() as usize;
         let tree_factor = 1;
         if array_est <= tree_est * tree_factor {
-            self.shuffle_tree(rng);
-        } else {
             self.shuffle_array_inner(rng, array_est);
+        } else {
+            self.shuffle_tree(rng);
         }
     }
 
+    /// Shuffle the branches and distribute the prizes to the entrants.
     pub fn shuffle_tree(&'prize mut self, rng: &mut impl Rng) {
         if self.shuffled {
             return;
@@ -161,6 +163,7 @@ where
         while space_efficient_shuffler.try_draw_one(rng, &mut prizes) {}
     }
 
+    /// Shuffle the slots and distribute the prizes to the entrants.
     pub fn shuffle_array<R>(&'prize mut self, rng: &mut R)
     where
         R: Rng,
@@ -173,25 +176,9 @@ where
     where
         R: Rng,
     {
-        if self.shuffled {
-            return;
-        }
-        Self::shuffle_array_core(&mut self.entrants, &self.prizes, rng, num_tickets);
-        self.shuffled = true;
-    }
-
-    /// Shuffle the slots and distribute the prizes to the entrants.
-    fn shuffle_array_core<R>(
-        entrants: &'prize mut HashMap<K, E, S>,
-        prizes: &'prize [Prize],
-        rng: &mut R,
-        num_tickets: usize,
-    ) where
-        R: Rng,
-    {
         use std::iter::repeat_n;
 
-        let keys = entrants.values().map(Entrant::key).collect::<Vec<_>>();
+        let keys = self.entrants.values().map(Entrant::key).collect::<Vec<_>>();
         let mut available_entrants = keys.iter().collect::<HashSet<&K, S>>();
         // Shuffle the slots, each entrant has `entrant.ticket_count()` slots.
         // Use the entrant's key to point back to itself.
@@ -199,7 +186,7 @@ where
         let tickets_god_only_knows_which_entrant = {
             use rand::seq::SliceRandom;
             let mut ret =
-                entrants
+                self.entrants
                     .values()
                     .zip(&keys)
                     .fold(Vec::with_capacity(num_tickets), |mut ret, (entrant, key)| {
@@ -223,15 +210,16 @@ where
         // p2 -> u2
         // p2 -> u6 // skip u5, same assumption
         // p2 -> u7
-        let prizes = prizes.iter().flat_map(|p| repeat_n(p, p.count()));
+        let prizes = self.prizes.iter().flat_map(|p| repeat_n(p, p.count()));
         let mut tickets = tickets_god_only_knows_which_entrant.into_iter();
-        for prize in prizes {
+        // I do hate this notation, but borrowing is annoier
+        'outer: for prize in prizes {
             for ticket in tickets.by_ref() {
                 // It is possible to use raw pointer to reduce both key production and hashing costs.
                 // However, it requires unsafe.
                 // Fortunately, this is not recursive, and relative simple to check the boundary.
                 if available_entrants.contains(ticket) {
-                    if entrants.get_mut(ticket).unwrap().add_prize(prize) {
+                    if self.entrants.get_mut(ticket).unwrap().add_prize(prize) {
                         // entrant may accept more prizes, no-op
                         break;
                     } else {
@@ -240,12 +228,14 @@ where
                         if available_entrants.is_empty() {
                             // when all the entrants are fulfilled (none of them can add prize),
                             // it is good to early return.
-                            return;
+                            break 'outer;
                         }
                     }
                 }
             }
         }
+        // always ensure the process won't proceed twice
+        self.shuffled = true;
     }
 }
 
