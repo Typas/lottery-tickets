@@ -1,53 +1,44 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, RandomState};
 use std::iter::repeat_n;
-use std::marker::PhantomData;
 
 use rand::Rng;
 
 use crate::entrant::Entrant;
 use crate::prize::Prize;
 use crate::space_efficient_shuffler;
-pub struct Lottery<'entrant, K, U, S = RandomState>
+pub struct Lottery<K, E, S = RandomState>
 where
     K: Hash + Eq,
-    U: Entrant<'entrant, Key = K>,
 {
     /// Determine whether the lottery has been shuffled and done.
     shuffled: bool,
     /// The entrants in a hash map, use .entrants() to get the result
-    entrants: HashMap<K, U, S>,
+    entrants: HashMap<K, E, S>,
     /// The prizes, the lower the index, the higher the priority.
     prizes: Vec<Prize>,
-    /// The lifetime is actually refering to those `impl Entrant` in the map,
-    /// which in turn is referring to `Prize` in this exact struct (`Self::prizes`)
-    ///
-    /// Rust complains if not explicitly used in any of the fields,
-    /// thus the marker.
-    _marker: PhantomData<&'entrant U>,
 }
 
-impl<'u, K, U> Default for Lottery<'u, K, U>
+impl<'entrant, K, E> Default for Lottery<K, E>
 where
     K: Hash + Eq,
-    U: Entrant<'u, Key = K>,
+    E: Entrant<'entrant, Key = K>,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'u, K, U> Lottery<'u, K, U>
+impl<'entrant, K, E> Lottery<K, E>
 where
     K: Hash + Eq,
-    U: Entrant<'u, Key = K>,
+    E: Entrant<'entrant, Key = K>,
 {
     pub fn new() -> Self {
         Self {
             entrants: HashMap::new(),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -56,15 +47,14 @@ where
             entrants: HashMap::with_capacity(cap),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 }
 
-impl<'u, K, U, S> Lottery<'u, K, U, S>
+impl<'entrant, K, E, S> Lottery<K, E, S>
 where
     K: Hash + Eq,
-    U: Entrant<'u, Key = K>,
+    E: Entrant<'entrant, Key = K>,
     S: std::hash::BuildHasher + std::default::Default,
 {
     pub fn with_entrant_capacity_and_hasher(cap: usize, hasher: S) -> Self {
@@ -72,7 +62,6 @@ where
             entrants: HashMap::with_capacity_and_hasher(cap, hasher),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -81,7 +70,6 @@ where
             entrants: HashMap::with_hasher(hasher),
             prizes: Vec::new(),
             shuffled: false,
-            _marker: PhantomData,
         }
     }
 
@@ -92,7 +80,7 @@ where
 
     /// Add a entrant to the lottery.
     /// When the keys collide, it would return the old entrant.
-    pub fn add_entrant(&mut self, entrant: U) -> Option<U> {
+    pub fn add_entrant(&mut self, entrant: E) -> Option<E> {
         self.entrants.insert(entrant.key(), entrant)
     }
 
@@ -100,7 +88,7 @@ where
     /// It is possible to have less entrant if the keys collide.
     pub fn set_entrants<C>(&mut self, entrants: C)
     where
-        C: IntoIterator<Item = U>,
+        C: IntoIterator<Item = E>,
     {
         self.entrants.clear();
         self.entrants = entrants.into_iter().map(|u| (u.key(), u)).collect();
@@ -124,19 +112,25 @@ where
     }
 
     /// Returns the entrants.
-    pub fn entrants(&self) -> std::collections::hash_map::Values<'_, K, U> {
+    pub fn entrants(&self) -> std::collections::hash_map::Values<'_, K, E> {
         self.entrants.values()
     }
 
     /// Returns the entrants, which are mutable.
-    pub fn entrants_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, U> {
+    pub fn entrants_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, E> {
         self.entrants.values_mut()
     }
+}
 
-    pub fn shuffle<'myself>(&'myself mut self, rng: &mut impl Rng)
-    where
-        'myself: 'u,
-    {
+impl<'entrant, 'prize, K, E, S> Lottery<K, E, S>
+where
+    K: Hash + Eq,
+    E: Entrant<'entrant, Key = K>,
+    S: std::hash::BuildHasher + std::default::Default,
+    'prize: 'entrant,
+{
+    /// Shuffle and distribute the prizes to the entrants.
+    pub fn shuffle(&'prize mut self, rng: &mut impl Rng) {
         // FIXME: this is just a guess.
         // Let `u` be the number of entrants, `t` be the number of tickets, `p` be the number of prizes.
         // Assuming the size of "tree" would require 24 * 2 * u * log(u),
@@ -147,16 +141,14 @@ where
         let tree_est = 3 * self.entrants.len() * self.entrants.len().ilog2() as usize;
         let tree_factor = 1;
         if array_est <= tree_est * tree_factor {
-            self.shuffle_tree(rng);
+            self.shuffle_array_inner(rng, array_est);
         } else {
-            self.shuffle_array(rng);
+            self.shuffle_tree(rng);
         }
     }
 
-    pub fn shuffle_tree<'myself>(&'myself mut self, rng: &mut impl Rng)
-    where
-        'myself: 'u,
-    {
+    /// Shuffle the branches and distribute the prizes to the entrants.
+    pub fn shuffle_tree(&'prize mut self, rng: &mut impl Rng) {
         if self.shuffled {
             return;
         }
@@ -172,36 +164,35 @@ where
     }
 
     /// Shuffle the slots and distribute the prizes to the entrants.
-    pub fn shuffle_array<'myself, R>(&'myself mut self, rng: &mut R)
+    pub fn shuffle_array<R>(&'prize mut self, rng: &mut R)
     where
         R: Rng,
-        'myself: 'u,
+    {
+        let total_ticket_count: usize = self.entrants.values().map(|u| u.ticket_count()).sum();
+        self.shuffle_array_inner(rng, total_ticket_count);
+    }
+
+    fn shuffle_array_inner<R>(&'prize mut self, rng: &mut R, num_tickets: usize)
+    where
+        R: Rng,
     {
         use std::iter::repeat_n;
-        // Shuffle twice would cause double spend.
-        if self.shuffled {
-            return;
-        }
 
+        let keys = self.entrants.values().map(Entrant::key).collect::<Vec<_>>();
+        let mut available_entrants = keys.iter().collect::<HashSet<&K, S>>();
         // Shuffle the slots, each entrant has `entrant.ticket_count()` slots.
         // Use the entrant's key to point back to itself.
         // The complexity shuffling would be both O(n).
         let tickets_god_only_knows_which_entrant = {
             use rand::seq::SliceRandom;
-            let mut ret = Vec::from_iter(
+            let mut ret =
                 self.entrants
                     .values()
-                    // FIXME:
-                    // I suspect insisting keys to be `Clone` be more straightforward and cheaper
-                    // than triggering (potentially expensive) hash algorithm each time...?
-                    // BUT
-                    // there may be some hash algorithms that are expensive to calculate
-                    // and expensive to clone...
-                    .flat_map(|entrant| {
-                        // HACK: calculate hash each time to circumvent lifetime of keys of the map
-                        repeat_n((), entrant.ticket_count()).map(|_| entrant.key())
-                    }),
-            );
+                    .zip(&keys)
+                    .fold(Vec::with_capacity(num_tickets), |mut ret, (entrant, key)| {
+                        ret.extend(repeat_n(key, entrant.ticket_count()));
+                        ret
+                    });
             ret.shuffle(rng);
             ret
         };
@@ -221,16 +212,29 @@ where
         // p2 -> u7
         let prizes = self.prizes.iter().flat_map(|p| repeat_n(p, p.count()));
         let mut tickets = tickets_god_only_knows_which_entrant.into_iter();
-        for prize in prizes {
+        // I do hate this notation, but borrowing is annoier
+        'outer: for prize in prizes {
             for ticket in tickets.by_ref() {
                 // It is possible to use raw pointer to reduce both key production and hashing costs.
                 // However, it requires unsafe.
                 // Fortunately, this is not recursive, and relative simple to check the boundary.
-                if self.entrants.get_mut(&ticket).unwrap().add_prize(prize) {
-                    break;
+                if available_entrants.contains(ticket) {
+                    if self.entrants.get_mut(ticket).unwrap().add_prize(prize) {
+                        // entrant may accept more prizes, no-op
+                        break;
+                    } else {
+                        // entrant accepts prizes no more, purge it
+                        available_entrants.remove(ticket);
+                        if available_entrants.is_empty() {
+                            // when all the entrants are fulfilled (none of them can add prize),
+                            // it is good to early return.
+                            break 'outer;
+                        }
+                    }
                 }
             }
         }
+        // always ensure the process won't proceed twice
         self.shuffled = true;
     }
 }
